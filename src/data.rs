@@ -1,77 +1,48 @@
 #![allow(non_snake_case)]
-use druid::{im::Vector, Data, Lens, EventCtx, Env, ArcStr, KeyOrValue};
+use druid::{im::Vector, Data, Lens, EventCtx, Env, ArcStr, KeyOrValue, FontFamily};
 use std::fs::File;
 use std::io::{BufReader, Error};
 use druid::widget::TextBox;
 use druid::text::{RichText, Attribute};
 
+const SIZE_FONT: f64 = 40.0;
+
 #[derive(Clone, Data, Lens)]
 pub struct AppState {
-    new_todo: String,
-    todos: Vector<TodoItem>,
+    font_size: String,
     rich_text: RichText
 }
 
 impl AppState {
-    pub fn new(todos: Vec<TodoItem>) -> Self {
+    pub fn new() -> Self {
         Self {
-            new_todo: "".into(),
-            todos: Vector::from(todos),
-            rich_text: RichText::new(ArcStr::from("Oidocrop")).with_attribute(0..20,Attribute::FontSize(KeyOrValue::Concrete(50.0)))
-        }
-    }
-
-    pub(crate)  fn add_todo(&mut self) {
-        self.todos.push_front(TodoItem::new(&self.new_todo));
-        self.new_todo = "".into();
-        self.save_to_json().unwrap();
-    }
-
-    pub fn click_add(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
-        data.add_todo();
-    }
-
-    pub fn save_to_json(&self) -> Result<(), Error> {
-        let todo_vec: Vec<TodoItem> = self.todos.iter().map(|item| item.to_owned()).collect();
-        let serialized = serde_json::to_string_pretty(&todo_vec)?;
-        std::fs::write("todos.json", serialized)?;
-        Ok(())
-    }
-
-    pub fn load_from_json() -> Self {
-        let file = File::open("todos.json");
-
-        match file {
-            Ok(file) => {
-                let reader = BufReader::new(file);
-                let todos: Vec<TodoItem> = serde_json::from_reader(reader).unwrap_or(vec![]);
-                Self {
-                    todos: Vector::from(todos),
-                    new_todo: String::new(),
-                    rich_text: RichText::new(ArcStr::from("Oidocrop")),
-                }
-            }
-            Err(_) => Self {
-                todos: Vector::new(),
-                new_todo: String::new(),
-                rich_text: RichText::new(ArcStr::from("Oidocrop")),
-            },
+            font_size: SIZE_FONT.to_string(),
+            rich_text: RichText::new(ArcStr::from("Nel mezzo del cammin di nostra vita
+mi ritrovai per una selva oscura
+ché la diritta via era smarrita. 3
+Ahi quanto a dir qual era è cosa dura
+esta selva selvaggia e aspra e forte
+che nel pensier rinova la paura! 6
+Tant’è amara che poco è più morte;
+ma per trattar del ben ch’i’ vi trovai,
+dirò de l’altre cose ch’i’ v’ho scorte. 9
+Io non so ben ridir com’i’ v’intrai,
+tant’era pien di sonno a quel punto
+che la verace via abbandonai.Nel mezzo del cammin di nostra vita
+mi ritrovai per una selva oscura
+ché la diritta via era smarrita. 3
+Ahi quanto a dir qual era è cosa dura
+esta selva selvaggia e aspra e forte
+che nel pensier rinova la paura! 6
+Tant’è amara che poco è più morte;
+ma per trattar del ben ch’i’ vi trovai,
+dirò de l’altre cose ch’i’ v’ho scorte. 9
+Io non so ben ridir com’i’ v’intrai,
+tant’era pien di sonno a quel punto
+che la verace via abbandonai.")).with_attribute(..,Attribute::FontSize(KeyOrValue::Concrete(SIZE_FONT)))
+                .with_attribute(..,Attribute::FontFamily(FontFamily::SANS_SERIF))
         }
     }
 }
 
-#[derive(Clone, Data, Lens, serde::Serialize, serde::Deserialize)]
-pub struct TodoItem {
-    pub(crate) done: bool,
-    pub text: String,
-}
-
-impl TodoItem {
-    pub fn new(text: &str) -> Self {
-        Self {
-            done: false,
-            text: text.into(),
-        }
-    }
-}
 

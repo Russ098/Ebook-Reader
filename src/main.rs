@@ -1,4 +1,4 @@
-use druid::{AppLauncher, WindowDesc, Point};
+use druid::{AppLauncher, WindowDesc};
 
 mod data;
 use data::AppState;

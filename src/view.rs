@@ -1,21 +1,22 @@
 use druid::{widget::{Checkbox, Flex, Label, List}, Widget, WidgetExt, EventCtx, Env, Color, ArcStr};
 
 use crate::data::*;
-use druid::widget::{TextBox, Button, Container};
+use druid::widget::{TextBox, Button, Container, LabelText, RawLabel};
 use crate::controller::TodoItemController;
 use druid::text::RichText;
 use std::convert::TryFrom;
 
 fn todo_item() -> impl Widget<TodoItem> {
-    let openButton = Button::new("Open").padding(5.0);
-    let editButton = Button::new("Edit").padding(5.0);
-    let saveButton = Button::new("Save").padding(5.0);
+    let open_button = Button::new("Open").padding(5.0);
+    let edit_button = Button::new("Edit").padding(5.0);
+    let save_button = Button::new("Save").padding(5.0);
+
 
     Flex::row()
 
-        .with_child(openButton)
-        .with_child(editButton)
-        .with_child(saveButton)
+        .with_child(open_button)
+        .with_child(edit_button)
+        .with_child(save_button)
         .align_left()
         .background(Color::WHITE)
         .border(Color::GRAY,0.5)
@@ -26,6 +27,7 @@ fn todo_item() -> impl Widget<TodoItem> {
 pub fn build_ui() -> impl Widget<AppState> {
     Flex::column()
         .with_child(List::new(todo_item).lens(AppState::todos))
+        .with_child(RawLabel::new().lens(AppState::rich_text))
 }
 
 //fn new_todo_textbox() -> impl Widget<AppState> {

@@ -1,12 +1,15 @@
-use druid::{im::Vector, Data, Lens, EventCtx, Env};
+#![allow(non_snake_case)]
+use druid::{im::Vector, Data, Lens, EventCtx, Env, ArcStr, KeyOrValue};
 use std::fs::File;
 use std::io::{BufReader, Error};
 use druid::widget::TextBox;
+use druid::text::{RichText, Attribute};
 
 #[derive(Clone, Data, Lens)]
 pub struct AppState {
     new_todo: String,
     todos: Vector<TodoItem>,
+    rich_text: RichText
 }
 
 impl AppState {
@@ -14,6 +17,7 @@ impl AppState {
         Self {
             new_todo: "".into(),
             todos: Vector::from(todos),
+            rich_text: RichText::new(ArcStr::from("Oidocrop")).with_attribute(0..20,Attribute::FontSize(KeyOrValue::Concrete(50.0)))
         }
     }
 
@@ -44,11 +48,13 @@ impl AppState {
                 Self {
                     todos: Vector::from(todos),
                     new_todo: String::new(),
+                    rich_text: RichText::new(ArcStr::from("Oidocrop")),
                 }
             }
             Err(_) => Self {
                 todos: Vector::new(),
                 new_todo: String::new(),
+                rich_text: RichText::new(ArcStr::from("Oidocrop")),
             },
         }
     }

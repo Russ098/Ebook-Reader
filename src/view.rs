@@ -4,7 +4,7 @@ use crate::data::*;
 use druid::widget::{TextBox, Button, RawLabel, Scroll, SizedBox};
 
 fn option_row() -> impl Widget<AppState> {
-    let open_button = Button::new("Open").padding(5.0);
+    let open_button = Button::new("Open").padding(5.0).on_click(AppState::click_open_button);
     let edit_button = Button::new("Edit").padding(5.0);
     let save_button = Button::new("Save").padding(5.0);
     Flex::row()

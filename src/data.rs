@@ -1,4 +1,4 @@
-use druid::{Data, Lens, EventCtx, Env, ArcStr, KeyOrValue, FontFamily, commands};
+use druid::{Data, Lens, EventCtx, Env, ArcStr, KeyOrValue, FontFamily, commands, AppDelegate, DelegateCtx, Target, Command, Handled};
 use druid::text::{RichText, Attribute};
 
 const SIZE_FONT: f64 = 40.0;
@@ -15,9 +15,7 @@ impl AppState {
         Self {
             font_size: SIZE_FONT.to_string(),
             ebook: String::new(),
-            rich_text: RichText::new(ArcStr::from(""))
-                .with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(SIZE_FONT)))
-                .with_attribute(.., Attribute::FontFamily(FontFamily::SANS_SERIF)),
+            rich_text: RichText::new(ArcStr::from("prova")).with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(40.)))
         }
     }
     pub fn click_plus_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
@@ -26,8 +24,7 @@ impl AppState {
     fn plus(&mut self) {
         let new_size = self.font_size.parse::<f64>().unwrap() + 1.;
         self.font_size = new_size.to_string();
-        //self.rich_text = self.rich_text.clone().with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(new_size)));
-        self.rich_text.add_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(new_size)));
+        self.rich_text = RichText::new(ArcStr::from(self.ebook.clone())).with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(new_size)));
     }
     pub fn click_min_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         data.min();
@@ -35,22 +32,47 @@ impl AppState {
     fn min(&mut self) {
         let new_size = self.font_size.parse::<f64>().unwrap() - 1.;
         self.font_size = new_size.to_string();
-        //self.rich_text = self.rich_text.clone().with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(new_size)));
-        self.rich_text.add_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(new_size)));
+        self.rich_text = RichText::new(ArcStr::from(self.ebook.clone())).with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(new_size)));
     }
-    pub fn click_open_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
+
+}
+pub struct Delegate;
+
+impl AppDelegate<AppState> for Delegate {
+    fn command(
+        &mut self,
+        _ctx: &mut DelegateCtx,
+        _target: Target,
+        cmd: &Command,
+        data: &mut AppState,
+        _env: &Env,
+    ) -> Handled {
+        //if let Some(file_info) = cmd.get(commands::SAVE_FILE_AS) {
+            //if let Err(e) = std::fs::write(file_info.path(), &data[..]) {
+                //println!("Error writing file: {}", e);
+            //}
+            //return Handled::Yes;
+        //}
         if let Some(file_info) = cmd.get(commands::OPEN_FILE) {
             match std::fs::read_to_string(file_info.path()) {
                 Ok(s) => {
-                    let first_line = s.lines().next().unwrap_or("");
-                    data.ebook = first_line.to_owned();
+                    for line in s.lines(){
+                        data.ebook.push_str(line);
+                        data.ebook.push('\n');
+                    }
+                    data.rich_text = RichText::new(ArcStr::from(data.ebook.clone()))
+                        .with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(data.font_size.parse::<f64>().unwrap())))
+                        .with_attribute(.., Attribute::FontFamily(FontFamily::SANS_SERIF));
                 }
                 Err(e) => {
-
+                    println!("Error opening file: {}", e);
                 }
             }
+            return Handled::Yes;
         }
+        Handled::No
     }
 }
+
 
 

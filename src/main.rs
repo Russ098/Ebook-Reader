@@ -2,6 +2,7 @@ use druid::{AppLauncher, WindowDesc};
 
 mod data;
 use data::AppState;
+use data::Delegate;
 
 mod view;
 
@@ -16,6 +17,7 @@ pub fn main() {
     let initial_state = AppState::new();
 
     AppLauncher::with_window(main_window)
+        .delegate(Delegate)
         .launch(initial_state)
         .expect("Failed to launch application");
 }

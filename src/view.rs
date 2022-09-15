@@ -27,10 +27,9 @@ fn option_row() -> impl Widget<AppState> {
 
     let open_button = Button::new("Open").padding(5.0).on_click(move |ctx, _, _| {
         ctx.submit_command(druid::commands::SHOW_OPEN_PANEL.with(open_dialog_options.clone()))
-
     });
-    let edit_button = Button::new("Edit").padding(5.0);
-    let save_button = Button::new("Save").padding(5.0);
+    let edit_button = Button::new("Edit").padding(5.0).on_click(AppState::click_edit_button);
+    let save_button = Button::new("Save").padding(5.0).on_click(AppState::click_save_button);
     Flex::row()
         .with_child(open_button)
         .with_child(edit_button)
@@ -40,8 +39,8 @@ fn option_row() -> impl Widget<AppState> {
         .border(Color::GRAY,0.5)
 }
 fn settings_row() -> impl Widget<AppState> {
-    let single_page_button = Button::new("Single Page").padding(5.0);
-    let double_page_button = Button::new("Double Page").padding(5.0);
+    let single_page_button = Button::new("Single Page").padding(5.0).on_click(AppState::click_single_page_button);
+    let double_page_button = Button::new("Double Page").padding(5.0).on_click(AppState::click_double_page_button);
     let plus_button = Button::new("+").padding(5.0).on_click(AppState::click_plus_button);
     let min_button = Button::new("-").padding(5.0).on_click(AppState::click_min_button);
     let edit_size_text = TextBox::new()
@@ -62,7 +61,7 @@ fn settings_row() -> impl Widget<AppState> {
 pub fn build_ui() -> impl Widget<AppState> {
     let mut c = Flex::column();
     c.add_child(option_row());
-    c.add_flex_child(SizedBox::new(Scroll::new(RawLabel::new().lens(AppState::rich_text))),1.0);
+    c.add_flex_child(SizedBox::new(Scroll::new(RawLabel::new().lens(AppState::rich_text))).expand_height(),1.0);
     c.add_child(settings_row());
     return c;
 }

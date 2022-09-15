@@ -24,7 +24,11 @@ impl AppState {
     fn plus(&mut self) {
         let new_size = self.font_size.parse::<f64>().unwrap() + 1.;
         self.font_size = new_size.to_string();
-        self.rich_text = RichText::new(ArcStr::from(self.ebook.clone())).with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(new_size)));
+        if self.ebook.is_empty(){
+            self.rich_text = RichText::new(ArcStr::from(new_size.to_string().as_str())).with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(new_size)));
+        }else{
+            self.rich_text = RichText::new(ArcStr::from(self.ebook.clone())).with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(new_size)));
+        }
     }
     pub fn click_min_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         data.min();
@@ -32,9 +36,27 @@ impl AppState {
     fn min(&mut self) {
         let new_size = self.font_size.parse::<f64>().unwrap() - 1.;
         self.font_size = new_size.to_string();
-        self.rich_text = RichText::new(ArcStr::from(self.ebook.clone())).with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(new_size)));
+        if self.ebook.is_empty(){
+            self.rich_text = RichText::new(ArcStr::from(new_size.to_string().as_str())).with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(new_size)));
+        }else{
+            self.rich_text = RichText::new(ArcStr::from(self.ebook.clone())).with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(new_size)));
+        }
+    }
+    pub fn click_edit_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env){
+
     }
 
+    pub fn click_save_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env){
+
+    }
+
+    pub fn click_single_page_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env){
+
+    }
+
+    pub fn click_double_page_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env){
+
+    }
 }
 pub struct Delegate;
 

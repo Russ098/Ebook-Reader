@@ -5,14 +5,12 @@ use druid::widget::{TextBox, Button, RawLabel, Scroll, SizedBox};
 
 fn option_row() -> impl Widget<AppState> {
 
-    let rs = FileSpec::new("Rust source", &["rs"]);
-    let txt = FileSpec::new("Text file", &["txt"]);
-    let other = FileSpec::new("Bogus file", &["foo", "bar", "baz"]);
-    let default_save_name = String::from("MyFile.txt");
+    let epub= FileSpec::new("Epub file", &["epub"]);
+    let default_save_name = String::from("MyFile.epub");
 
     let save_dialog_options = FileDialogOptions::new()
-        .allowed_types(vec![rs, txt, other])
-        .default_type(txt)
+        .allowed_types(vec![epub])
+        .default_type(epub)
         .default_name(default_save_name)
         .name_label("Target")
         .title("Choose a target for this lovely file")
@@ -20,7 +18,7 @@ fn option_row() -> impl Widget<AppState> {
 
     let open_dialog_options = save_dialog_options
         .clone()
-        .default_name("MySavedFile.txt")
+        .default_name("MySavedFile.epub")
         .name_label("Source")
         .title("Where did you put that file?")
         .button_text("Import");

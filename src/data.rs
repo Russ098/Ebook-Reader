@@ -1,17 +1,33 @@
+use std::error::Error;
+use std::fmt::Debug;
 use druid::{Data, Lens, EventCtx, Env, ArcStr, KeyOrValue, FontFamily, commands, AppDelegate, DelegateCtx, Target, Command, Handled};
 use druid::text::{RichText, Attribute};
 use epub::doc::EpubDoc;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use epub::archive::EpubArchive;
+use html2text::from_read;
 
 const SIZE_FONT: f64 = 40.0;
+
+pub struct Ebook{
+    chapters_list : Vec<String>
+}
+
+impl Ebook{
+    pub fn new() -> Self{
+        Self{chapters_list : Vec::new()}
+    }
+}
 
 #[derive(Clone, Data, Lens)]
 pub struct AppState {
     font_size: String,
     rich_text: RichText,
     ebook: String,
+    current_chapter_index : usize
+    //todo current_page_index (?)
 }
 
 impl AppState {
@@ -19,7 +35,8 @@ impl AppState {
         Self {
             font_size: SIZE_FONT.to_string(),
             ebook: String::new(),
-            rich_text: RichText::new(ArcStr::from("prova")).with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(40.)))
+            rich_text: RichText::new(ArcStr::from("prova")).with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(40.))),
+            current_chapter_index : 0
         }
     }
     pub fn click_plus_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
@@ -82,52 +99,28 @@ impl AppDelegate<AppState> for Delegate {
         //}
         if let Some(file_info) = cmd.get(commands::OPEN_FILE) {
             println!("{}",file_info.path().display());
-            match EpubDoc::new(file_info.path()) {
-                Ok(mut s) => {
-                    if let Some(title) = s.mdata("title") {
-                        println!("Book title: {}", title);
-                    } else {
-                        println!("Book title not found");
-                    }
-                    println!("Num Pages: {}\n", s.get_num_pages());
+            match EpubArchive::new(file_info.path())
+            {
+                Ok(mut archive) => {
+                    for f in archive.files.clone(){
+                        if f.contains("OEBPS") && f.contains("htm.html"){
+                            println!("{}", f);
+                            // let res = archive.get_entry_as_str(f);
+                            let res = archive.get_entry(f);
+                            if res.is_ok(){
+                                let translated_html = from_read(res.unwrap().as_slice(), 50);
 
-                    {
-                        println!("resources:\n");
-                        for (k, v) in s.resources.iter() {
-                            println!("{}: {}\n * {}\n", k, v.1, v.0.to_str().unwrap());
-                            let fileref = file_info.path().to_str().unwrap().to_owned().replace(".epub", "\\") + v.0.as_path().to_str().unwrap();
-                            println!("percorso: {}",fileref);
-                            let file = File::open(Path::new(fileref.as_str()));
-                            match file {
-                                Ok(mut f) => {
-                                    f.read_to_string(&mut data.ebook.clone());
-                                }
-                                Err(e) => {
-                                    println!("Errore apertura file xml: {}", e);
-                                }
+                                data.ebook = translated_html.clone();
+                                data.rich_text = RichText::new(ArcStr::from(data.ebook.clone())).with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(40.)));
+                                // println!("{}", res.unwrap());
+                                println!("{}", translated_html);
                             }
                         }
-                        println!("fine resources");
                     }
-/*
-                    while let Ok(_) = s.go_next() {
-                        println!("ID: {}", s.get_current_id().unwrap());
-                        let current = s.get_current_str();
-                        match current {
-                            Ok(v) => {
-                                println!("Value {:?}\n", v);
-                                data.ebook.push_str(v.as_str());
-                            },
-                            Err(e) => println!("Text Err {:?}\n", e),
-                        }
-                    }
- */
-                    data.rich_text = RichText::new(ArcStr::from(data.ebook.clone()))
-                        .with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(data.font_size.parse::<f64>().unwrap())))
-                        .with_attribute(.., Attribute::FontFamily(FontFamily::SANS_SERIF));
                 }
-                Err(e) => {
-                    println!("Error opening file: {}", e);
+                Err(error) => {
+                    //TODO
+                    println!("Error while opening archive: {}", error);
                 }
             }
             return Handled::Yes;
@@ -135,6 +128,4 @@ impl AppDelegate<AppState> for Delegate {
         Handled::No
     }
 }
-
-
 

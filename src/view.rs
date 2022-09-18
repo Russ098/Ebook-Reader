@@ -1,7 +1,7 @@
-use druid::{widget::{Flex}, Widget, WidgetExt, Color, UnitPoint, FileDialogOptions, FileSpec};
+use druid::{widget::{Flex}, Widget, WidgetExt, Color, UnitPoint, FileDialogOptions, FileSpec, lens};
 
 use crate::data::*;
-use druid::widget::{TextBox, Button, RawLabel, Scroll, SizedBox};
+use druid::widget::{TextBox, Button, RawLabel, Scroll, SizedBox, LensWrap};
 
 fn option_row() -> impl Widget<AppState> {
 
@@ -64,5 +64,5 @@ pub fn build_ui() -> impl Widget<AppState> {
     return c;
 }
 
-
-
+//TODO: creare una nuova fz che implementi Widget<AppState> e che si modifichi in base al contenuto del Vector (contenuto nella "nuova" struct in data.rs)
+// andando a creare Widget::Image (per le immagini) e Widget::RawLabel (o Label) per il testo

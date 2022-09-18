@@ -6,35 +6,27 @@ use epub::doc::EpubDoc;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use druid::im::Vector;
 use epub::archive::EpubArchive;
-use html2text::from_read;
+use html2text::{from_read, from_read_rich};
 
 const SIZE_FONT: f64 = 40.0;
 
-pub struct Ebook{
-    chapters_list : Vec<String>
-}
-
-impl Ebook{
-    pub fn new() -> Self{
-        Self{chapters_list : Vec::new()}
-    }
-}
+//TODO: implemenatare una struttura che gestisca i capitolo secondo formattazione html v[0]="<p>Test<p>" v[1]="<img>....<img>"
 
 #[derive(Clone, Data, Lens)]
 pub struct AppState {
-    font_size: String,
+    pub font_size: String,
     rich_text: RichText,
-    ebook: String,
+    ebook: Vector<String>,
     current_chapter_index : usize
-    //todo current_page_index (?)
 }
 
 impl AppState {
     pub fn new() -> Self {
         Self {
             font_size: SIZE_FONT.to_string(),
-            ebook: String::new(),
+            ebook: Vector::new(),
             rich_text: RichText::new(ArcStr::from("prova")).with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(40.))),
             current_chapter_index : 0
         }
@@ -45,11 +37,11 @@ impl AppState {
     fn plus(&mut self) {
         let new_size = self.font_size.parse::<f64>().unwrap() + 1.;
         self.font_size = new_size.to_string();
-        if self.ebook.is_empty(){
+        /*if self.ebook.is_empty(){
             self.rich_text = RichText::new(ArcStr::from(new_size.to_string().as_str())).with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(new_size)));
         }else{
             self.rich_text = RichText::new(ArcStr::from(self.ebook.clone())).with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(new_size)));
-        }
+        }*/
     }
     pub fn click_min_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         data.min();
@@ -57,11 +49,11 @@ impl AppState {
     fn min(&mut self) {
         let new_size = self.font_size.parse::<f64>().unwrap() - 1.;
         self.font_size = new_size.to_string();
-        if self.ebook.is_empty(){
+        /*if self.ebook.is_empty(){
             self.rich_text = RichText::new(ArcStr::from(new_size.to_string().as_str())).with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(new_size)));
         }else{
             self.rich_text = RichText::new(ArcStr::from(self.ebook.clone())).with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(new_size)));
-        }
+        }*/
     }
     pub fn click_edit_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env){
 
@@ -106,14 +98,13 @@ impl AppDelegate<AppState> for Delegate {
                         if f.contains("OEBPS") && f.contains("htm.html"){
                             println!("{}", f);
                             // let res = archive.get_entry_as_str(f);
-                            let res = archive.get_entry(f);
+                            let res = archive.get_entry_as_str(f);
                             if res.is_ok(){
-                                let translated_html = from_read(res.unwrap().as_slice(), 50);
-
-                                data.ebook = translated_html.clone();
-                                data.rich_text = RichText::new(ArcStr::from(data.ebook.clone())).with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(40.)));
+                                println!("{}", res.unwrap());
+                                //TODO: riempire la struct che contiene Vector con il contenuto di ogni capitolo
+                                /*data.ebook = translated_html.clone();
+                                data.rich_text = RichText::new(ArcStr::from(data.ebook.clone())).with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(40.)));*/
                                 // println!("{}", res.unwrap());
-                                println!("{}", translated_html);
                             }
                         }
                     }

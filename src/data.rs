@@ -1,24 +1,46 @@
 use std::error::Error;
 use std::fmt::Debug;
-use druid::{Data, Lens, EventCtx, Env, ArcStr, KeyOrValue, FontFamily, commands, AppDelegate, DelegateCtx, Target, Command, Handled};
+use druid::{Data, Lens, EventCtx, Env, ArcStr, KeyOrValue, FontFamily, commands, AppDelegate, DelegateCtx, Target, Command, Handled, ImageBuf};
 use druid::text::{RichText, Attribute};
 use epub::doc::EpubDoc;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use druid::im::Vector;
+use druid::widget::Image;
 use epub::archive::EpubArchive;
 use html2text::{from_read, from_read_rich};
 
 const SIZE_FONT: f64 = 40.0;
 
 //TODO: implemenatare una struttura che gestisca i capitolo secondo formattazione html v[0]="<p>Test<p>" v[1]="<img>....<img>"
+#[derive(Clone, Data, Lens)]
+pub struct Chapter{
+    text : String,
+    images : Vector<Vector<u8>>
+}
+
+impl Chapter{
+    pub fn new() -> Self{
+        Self{
+            text : String::new(),
+            images : Vector::<Vector<u8>>::new()
+        }
+    }
+
+    pub fn load_params(txt : String, imgs : Vector<Vector<u8>>) -> Self{
+        Self{
+            text : txt,
+            images : imgs
+        }
+    }
+}
 
 #[derive(Clone, Data, Lens)]
 pub struct AppState {
     pub font_size: String,
     rich_text: RichText,
-    ebook: Vector<String>,
+    ebook: Vector<Chapter>,
     current_chapter_index : usize
 }
 
@@ -26,7 +48,7 @@ impl AppState {
     pub fn new() -> Self {
         Self {
             font_size: SIZE_FONT.to_string(),
-            ebook: Vector::new(),
+            ebook: Vector::<Chapter>::new(),
             rich_text: RichText::new(ArcStr::from("prova")).with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(40.))),
             current_chapter_index : 0
         }
@@ -100,8 +122,25 @@ impl AppDelegate<AppState> for Delegate {
                             // let res = archive.get_entry_as_str(f);
                             let res = archive.get_entry_as_str(f);
                             if res.is_ok(){
-                                println!("{}", res.unwrap());
+                                //println!("{}", res.unwrap());
                                 //TODO: riempire la struct che contiene Vector con il contenuto di ogni capitolo
+                                let mut s = res.as_ref().unwrap().find("</head>");
+                                if s.is_some(){
+                                    let s = s.unwrap()+7/*"/<head>".len()*/;
+                                    let img_occ = res.as_ref().unwrap().matches("<img").count();
+                                    if img_occ > 0{
+                                        let pos = res.as_ref().unwrap().find("<img");
+                                        if pos.is_some() {
+                                            for i in 0..img_occ{
+                                                for c in res.as_ref().unwrap()[pos.unwrap()..].chars(){
+                                                    //TODO: prelevare la stringa di riferimento per l'immagine lavorando carattere per carattere
+                                                }
+                                            }
+                                        }
+                                    }
+                                    let c = Chapter::new();
+                                    //data.ebook.push_back();
+                                }
                                 /*data.ebook = translated_html.clone();
                                 data.rich_text = RichText::new(ArcStr::from(data.ebook.clone())).with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(40.)));*/
                                 // println!("{}", res.unwrap());

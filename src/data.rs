@@ -9,29 +9,54 @@ use std::path::Path;
 use druid::im::Vector;
 use druid::widget::Image;
 use epub::archive::EpubArchive;
-use html2text::{from_read, from_read_rich};
+use imagesize::{size, ImageSize, blob_size};
+use druid::piet::ImageFormat;
 
 const SIZE_FONT: f64 = 40.0;
 
 //TODO: implemenatare una struttura che gestisca i capitolo secondo formattazione html v[0]="<p>Test<p>" v[1]="<img>....<img>"
 #[derive(Clone, Data, Lens)]
-pub struct Chapter{
-    text : String,
-    images : Vector<Vector<u8>>
+pub struct ImageOfChapter {
+    image: Vector<u8>,
+    width: usize,
+    height: usize,
 }
 
-impl Chapter{
-    pub fn new() -> Self{
-        Self{
-            text : String::new(),
-            images : Vector::<Vector<u8>>::new()
+impl ImageOfChapter {
+    pub fn new() -> Self {
+        Self {
+            image: Vector::new(),
+            width: 0,
+            height: 0,
+        }
+    }
+    pub fn from(image: Vector<u8>, width: usize, height: usize) -> Self {
+        Self {
+            image,
+            width,
+            height,
+        }
+    }
+}
+
+#[derive(Clone, Data, Lens)]
+pub struct Chapter {
+    text: String,
+    images: Vector<ImageOfChapter>,
+}
+
+impl Chapter {
+    pub fn new() -> Self {
+        Self {
+            text: String::new(),
+            images: Vector::<ImageOfChapter>::new(),
         }
     }
 
-    pub fn load_params(txt : String, imgs : Vector<Vector<u8>>) -> Self{
-        Self{
-            text : txt,
-            images : imgs
+    pub fn load_params(txt: String, imgs: Vector<ImageOfChapter>) -> Self {
+        Self {
+            text: txt,
+            images: imgs,
         }
     }
 }
@@ -41,7 +66,7 @@ pub struct AppState {
     pub font_size: String,
     rich_text: RichText,
     ebook: Vector<Chapter>,
-    current_chapter_index : usize
+    current_chapter_index: usize,
 }
 
 impl AppState {
@@ -50,7 +75,7 @@ impl AppState {
             font_size: SIZE_FONT.to_string(),
             ebook: Vector::<Chapter>::new(),
             rich_text: RichText::new(ArcStr::from("prova")).with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(40.))),
-            current_chapter_index : 0
+            current_chapter_index: 0,
         }
     }
     pub fn click_plus_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
@@ -77,21 +102,13 @@ impl AppState {
             self.rich_text = RichText::new(ArcStr::from(self.ebook.clone())).with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(new_size)));
         }*/
     }
-    pub fn click_edit_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env){
+    pub fn click_edit_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {}
 
-    }
+    pub fn click_save_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {}
 
-    pub fn click_save_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env){
+    pub fn click_single_page_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {}
 
-    }
-
-    pub fn click_single_page_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env){
-
-    }
-
-    pub fn click_double_page_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env){
-
-    }
+    pub fn click_double_page_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {}
 }
 
 pub struct Delegate;
@@ -106,45 +123,65 @@ impl AppDelegate<AppState> for Delegate {
         _env: &Env,
     ) -> Handled {
         //if let Some(file_info) = cmd.get(commands::SAVE_FILE_AS) {
-            //if let Err(e) = std::fs::write(file_info.path(), &data[..]) {
-                //println!("Error writing file: {}", e);
-            //}
-            //return Handled::Yes;
+        //if let Err(e) = std::fs::write(file_info.path(), &data[..]) {
+        //println!("Error writing file: {}", e);
+        //}
+        //return Handled::Yes;
         //}
         if let Some(file_info) = cmd.get(commands::OPEN_FILE) {
-            println!("{}",file_info.path().display());
+            println!("{}", file_info.path().display());
             match EpubArchive::new(file_info.path())
             {
                 Ok(mut archive) => {
-                    for f in archive.files.clone(){
-                        if f.contains("OEBPS") && f.contains("htm.html"){
+                    for f in archive.files.clone() {
+                        let mut i = 0;
+                        if f.contains("OEBPS") && f.contains("htm.html") {
+                            data.ebook.push_back(Chapter::new());
                             println!("{}", f);
                             // let res = archive.get_entry_as_str(f);
                             let res = archive.get_entry_as_str(f);
-                            if res.is_ok(){
-                                //println!("{}", res.unwrap());
+                            if res.is_ok() {
                                 //TODO: riempire la struct che contiene Vector con il contenuto di ogni capitolo
-                                let mut s = res.as_ref().unwrap().find("</head>");
-                                if s.is_some(){
-                                    let s = s.unwrap()+7/*"/<head>".len()*/;
-                                    let img_occ = res.as_ref().unwrap().matches("<img").count();
-                                    if img_occ > 0{
-                                        let pos = res.as_ref().unwrap().find("<img");
-                                        if pos.is_some() {
-                                            for i in 0..img_occ{
-                                                for c in res.as_ref().unwrap()[pos.unwrap()..].chars(){
-                                                    //TODO: prelevare la stringa di riferimento per l'immagine lavorando carattere per carattere
+                                let img_occ = res.as_ref().unwrap().matches("<img").count();
+                                let mut pos = res.as_ref().unwrap().find("<img");
+                                if img_occ > 0 {
+                                    if pos.is_some() {
+                                        let mut displacement: usize = 0;
+                                        for i in 0..img_occ {
+                                            println!("{}", pos.unwrap());
+                                            let mut s1 = String::from("OEBPS/");
+                                            let mut app = res.as_ref().unwrap()[pos.unwrap() + 3 + displacement..].find("src=");
+                                            println!("{}", pos.unwrap() + 3 + app.unwrap() + 5);
+                                            for c in res.as_ref().unwrap()[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].chars() {
+                                                if c == '"' {
+                                                    break;
+                                                } else {
+                                                    s1.push(c);
                                                 }
                                             }
+                                            //data.ebook[i].images.push_back(ImageBuf::from_raw(archive.get_entry(s1).unwrap(), ImageFormat::Rgb, size.unwrap().width, size.unwrap().height));
+                                            let (width, height) = match blob_size(archive.get_entry(s1.clone()).unwrap().as_slice()) {
+                                                Ok(dim) => (dim.width, dim.height),
+                                                Err(why) => {
+                                                    println!("Error getting dimensions: {:?}", why);
+                                                    (0, 0)
+                                                }
+                                            };
+                                            data.ebook[i].images.push_back(ImageOfChapter::from(Vector::from(archive.get_entry(s1).unwrap()), width, height));
+                                            let resapp = res.as_ref().unwrap()[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].find("<img");
+                                            displacement = pos.unwrap() + 3 + app.unwrap() + 5 + displacement;
+                                            pos = resapp;
                                         }
                                     }
-                                    let c = Chapter::new();
-                                    //data.ebook.push_back();
                                 }
+                                data.ebook[i].text.push_str(res.unwrap().clone().as_str());
+                                //let c = Chapter::new();
+                                //data.ebook.push_back();
                                 /*data.ebook = translated_html.clone();
                                 data.rich_text = RichText::new(ArcStr::from(data.ebook.clone())).with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(40.)));*/
                                 // println!("{}", res.unwrap());
                             }
+                            i += 1;
                         }
                     }
                 }

@@ -1,7 +1,9 @@
-use druid::{widget::{Flex}, Widget, WidgetExt, Color, UnitPoint, FileDialogOptions, FileSpec, lens};
+use druid::{widget::{Flex}, Widget, WidgetExt, Color, UnitPoint, FileDialogOptions, FileSpec, lens, Rect, ImageBuf};
 
 use crate::data::*;
-use druid::widget::{TextBox, Button, RawLabel, Scroll, SizedBox, LensWrap};
+use druid::widget::{TextBox, Button, RawLabel, Scroll, SizedBox, LensWrap, Image};
+use voca_rs::strip::strip_tags;
+use voca_rs::Voca;
 
 fn option_row() -> impl Widget<AppState> {
 
@@ -59,10 +61,62 @@ fn settings_row() -> impl Widget<AppState> {
 pub fn build_ui() -> impl Widget<AppState> {
     let mut c = Flex::column();
     c.add_child(option_row());
-    c.add_flex_child(SizedBox::new(Scroll::new(RawLabel::new().lens(AppState::rich_text))).expand_height(),1.0);
+    c.add_flex_child(Rebuilder::new().center(),1.0);
     c.add_child(settings_row());
     return c;
 }
 
-//TODO: creare una nuova fz che implementi Widget<AppState> e che si modifichi in base al contenuto del Vector (contenuto nella "nuova" struct in data.rs)
-// andando a creare Widget::Image (per le immagini) e Widget::RawLabel (o Label) per il testo
+//TODO: creare una nuova fz che implementi Widget<AppState> e che si modifichi in base al contenuto del Vector (contenuto nella "nuova"
+// struct in data.rs) andando a creare Widget::Image (per le immagini) e Widget::RawLabel (o Label) per il testo
+pub fn build_widget(state: &AppState) /*-> Box<dyn Widget<AppState>>*/ {
+    //titolo(?), testo, immagini
+    //SizedBox::new(Scroll::new(RawLabel::new().lens(AppState::rich_text))).expand_height()
+    //let png_data = ImageBuf::from_data(include_bytes!("./assets/PicWithAlpha.png")).unwrap();
+    //let mut flex_content = Flex::column();
+    let mut src = "".to_string();
+    let mut src_pos;
+
+    if state.ebook.len() > 0 {
+        for element in state.ebook[state.current_chapter_index].text.split("\n"){
+            if element.contains("img"){
+                src_pos = element.find("src=");
+                if src_pos.is_some(){
+                    for c in element[src_pos.unwrap() + 5 ..].chars() {
+                        if c == '"' {
+                            break;
+                        } else {
+                            src.push(c);
+                        }
+                    }
+                    println!("SRC_: {}", src);
+                }
+            }
+            println!("{}", element);
+            //TODO: inserire il contenuto ricavato nei Widget appositi (TextBox o simili e Immagini). Attenzione che per ora si hanno
+            // tutti i capitoli, ma all'apertura bisogna mostrare solo il contenuto del primo
+
+            //println!("{}", strip_tags(element));
+        }
+    }
+
+    /*let mut img = Image::new(png_data).fill_mode(state.fill_strat);
+    if state.interpolate {
+        img.set_interpolation_mode(state.interpolation_mode)
+    }
+    if state.clip {
+        img.set_clip_area(Some(Rect::new(
+            state.clip_x,
+            state.clip_y,
+            state.clip_x + state.clip_width,
+            state.clip_y + state.clip_height,
+        )));
+    }
+    let mut sized = SizedBox::new(img);
+    if state.fix_width {
+        sized = sized.fix_width(state.width)
+    }
+    if state.fix_height {
+        sized = sized.fix_height(state.height)
+    }
+    sized.border(Color::grey(0.6), 2.0).center().boxed()*/
+}

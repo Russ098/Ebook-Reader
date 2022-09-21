@@ -1,16 +1,17 @@
 use std::error::Error;
 use std::fmt::Debug;
-use druid::{Data, Lens, EventCtx, Env, ArcStr, KeyOrValue, FontFamily, commands, AppDelegate, DelegateCtx, Target, Command, Handled, ImageBuf};
+use druid::{Data, Lens, EventCtx, Env, ArcStr, KeyOrValue, FontFamily, commands, AppDelegate, DelegateCtx, Target, Command, Handled, ImageBuf, Widget, WidgetExt, Event, LifeCycleCtx, LifeCycle, UpdateCtx, LayoutCtx, BoxConstraints, Size, PaintCtx, WidgetId};
 use druid::text::{RichText, Attribute};
 use epub::doc::EpubDoc;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use druid::im::Vector;
-use druid::widget::Image;
+use druid::widget::{Image, SizedBox};
 use epub::archive::EpubArchive;
 use imagesize::{size, ImageSize, blob_size};
 use druid::piet::ImageFormat;
+use crate::view::build_widget;
 
 const SIZE_FONT: f64 = 40.0;
 
@@ -39,10 +40,64 @@ impl ImageOfChapter {
     }
 }
 
+pub struct Rebuilder {
+    inner: Box<dyn Widget<AppState>>,
+}
+
+impl Rebuilder {
+    pub fn new() -> Rebuilder {
+        Rebuilder {
+            inner: SizedBox::empty().boxed(),
+        }
+    }
+
+    fn rebuild_inner(&mut self, data: &AppState) {
+            /*self.inner = */build_widget(data);
+    }
+}
+
+impl Widget<AppState> for Rebuilder {
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut AppState, env: &Env) {
+        self.inner.event(ctx, event, data, env)
+    }
+
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &AppState, env: &Env) {
+        if let LifeCycle::WidgetAdded = event {
+            self.rebuild_inner(data);
+        }
+        self.inner.lifecycle(ctx, event, data, env)
+    }
+
+    fn update(&mut self, ctx: &mut UpdateCtx, old_data: &AppState, data: &AppState, _env: &Env) {
+        if !old_data.same(data) {
+            self.rebuild_inner(data);
+            ctx.children_changed();
+        }
+    }
+
+    fn layout(
+        &mut self,
+        ctx: &mut LayoutCtx,
+        bc: &BoxConstraints,
+        data: &AppState,
+        env: &Env,
+    ) -> Size {
+        self.inner.layout(ctx, bc, data, env)
+    }
+
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &AppState, env: &Env) {
+        self.inner.paint(ctx, data, env)
+    }
+
+    fn id(&self) -> Option<WidgetId> {
+        self.inner.id()
+    }
+}
+
 #[derive(Clone, Data, Lens)]
 pub struct Chapter {
-    text: String,
-    images: Vector<ImageOfChapter>,
+    pub text: String,
+    pub images: Vector<ImageOfChapter>,
 }
 
 impl Chapter {
@@ -65,8 +120,8 @@ impl Chapter {
 pub struct AppState {
     pub font_size: String,
     rich_text: RichText,
-    ebook: Vector<Chapter>,
-    current_chapter_index: usize,
+    pub ebook: Vector<Chapter>,
+    pub current_chapter_index: usize,
 }
 
 impl AppState {
@@ -129,29 +184,28 @@ impl AppDelegate<AppState> for Delegate {
         //return Handled::Yes;
         //}
         if let Some(file_info) = cmd.get(commands::OPEN_FILE) {
-            println!("{}", file_info.path().display());
+            //println!("{}", file_info.path().display());
             match EpubArchive::new(file_info.path())
             {
                 Ok(mut archive) => {
+                    data.current_chapter_index = 0;
                     for f in archive.files.clone() {
                         let mut i = 0;
                         if f.contains("OEBPS") && f.contains("htm.html") {
                             data.ebook.push_back(Chapter::new());
-                            println!("{}", f);
+                            //TODO: revisionare una volta fatto il salvataggio (per la questione relativa al segnalibro:
+                            // quando chiudo l'app, la prossima riapertura mi riporta all'ultima pagina letta (?))
                             // let res = archive.get_entry_as_str(f);
                             let res = archive.get_entry_as_str(f);
                             if res.is_ok() {
-                                //TODO: riempire la struct che contiene Vector con il contenuto di ogni capitolo
                                 let img_occ = res.as_ref().unwrap().matches("<img").count();
                                 let mut pos = res.as_ref().unwrap().find("<img");
                                 if img_occ > 0 {
                                     if pos.is_some() {
                                         let mut displacement: usize = 0;
                                         for i in 0..img_occ {
-                                            println!("{}", pos.unwrap());
                                             let mut s1 = String::from("OEBPS/");
                                             let mut app = res.as_ref().unwrap()[pos.unwrap() + 3 + displacement..].find("src=");
-                                            println!("{}", pos.unwrap() + 3 + app.unwrap() + 5);
                                             for c in res.as_ref().unwrap()[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].chars() {
                                                 if c == '"' {
                                                     break;

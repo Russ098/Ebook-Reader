@@ -6,6 +6,7 @@ use epub::doc::EpubDoc;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use std::str::from_utf8;
 use druid::im::Vector;
 use druid::widget::{Image, SizedBox};
 use epub::archive::EpubArchive;
@@ -18,9 +19,9 @@ const SIZE_FONT: f64 = 40.0;
 //TODO: implemenatare una struttura che gestisca i capitolo secondo formattazione html v[0]="<p>Test<p>" v[1]="<img>....<img>"
 #[derive(Clone, Data, Lens)]
 pub struct ImageOfChapter {
-    image: Vector<u8>,
-    width: usize,
-    height: usize,
+    pub image: Vector<u8>,
+    pub width: usize,
+    pub height: usize,
 }
 
 impl ImageOfChapter {
@@ -52,7 +53,7 @@ impl Rebuilder {
     }
 
     fn rebuild_inner(&mut self, data: &AppState) {
-            /*self.inner = */build_widget(data);
+            self.inner = build_widget(data);
     }
 }
 
@@ -185,7 +186,7 @@ impl AppDelegate<AppState> for Delegate {
         //}
         if let Some(file_info) = cmd.get(commands::OPEN_FILE) {
             //println!("{}", file_info.path().display());
-            match EpubArchive::new(file_info.path())
+            match EpubArchive::new(file_info.clone().path())
             {
                 Ok(mut archive) => {
                     data.current_chapter_index = 0;
@@ -213,7 +214,6 @@ impl AppDelegate<AppState> for Delegate {
                                                     s1.push(c);
                                                 }
                                             }
-                                            //data.ebook[i].images.push_back(ImageBuf::from_raw(archive.get_entry(s1).unwrap(), ImageFormat::Rgb, size.unwrap().width, size.unwrap().height));
                                             let (width, height) = match blob_size(archive.get_entry(s1.clone()).unwrap().as_slice()) {
                                                 Ok(dim) => (dim.width, dim.height),
                                                 Err(why) => {
@@ -221,7 +221,7 @@ impl AppDelegate<AppState> for Delegate {
                                                     (0, 0)
                                                 }
                                             };
-                                            data.ebook[i].images.push_back(ImageOfChapter::from(Vector::from(archive.get_entry(s1).unwrap()), width, height));
+                                            data.ebook[i].images.push_back(ImageOfChapter::from(Vector::from(archive.get_entry(s1.clone()).unwrap().as_slice()), width, height));
                                             let resapp = res.as_ref().unwrap()[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].find("<img");
                                             displacement = pos.unwrap() + 3 + app.unwrap() + 5 + displacement;
                                             pos = resapp;

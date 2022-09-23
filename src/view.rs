@@ -80,67 +80,62 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
     let mut src = "".to_string();
     let mut i = 0 as usize;
     // let v2 = state.ebook[state.current_chapter_index].images[i].clone().image;
-    let mut v : Vec<u8> = vec![];
+    let mut v: Vec<u8> = vec![];
+    let mut pixels_vec = Vec::new();
+
+
 
     if state.ebook.len() > 0 {
         for element in state.ebook[state.current_chapter_index].text.split("\n") {
-            /*if element.contains("img") {
-                /*let image_buf = ImageBuf::from_raw(Arc::new(try_from(v[..])), ImageFormat::Rgb, state.ebook[state.current_chapter_index].images[i].width,
-                                                   state.ebook[state.current_chapter_index].images[i].height);
-                let mut img = Image::new(image_buf).fill_mode(FillStrat::Cover);
-                let mut sized = SizedBox::new(img);*/
-                /*if state.fix_width {
-                    sized = sized.fix_width(state.width)
+            if element.contains("img") {
+                println!("Element: {} - i: {}", element, i);
+                println!("{}", state.ebook[state.current_chapter_index].images.len());
+                for pixel in state.ebook[state.current_chapter_index].images[i].image.clone(){
+                    pixels_vec.push(pixel);
                 }
-                if state.fix_height {
-                    sized = sized.fix_height(state.height)
-                }*/
-                // sized.border(Color::grey(0.6), 2.0).center().boxed();
-                /*src_pos = element.find("src=");
-                if src_pos.is_some(){
-                    for c in element[src_pos.unwrap() + 5 ..].chars() {
-                        if c == '"' {
-                            break;
-                        } else {
-                            src.push(c);
-                        }
-                    }
-                    println!("SRC_: {}", src);*/
-                // flex_content.with_child(sized);
-            } *//*else {*/
-            let _string = strip_tags(element);
-            let rl = Label::new(_string.clone());
-            println!("{}", _string.clone());
-            c.add_child(rl);
-            //}
+                //println!("len: {} - len2: {}", pixels_vec.len(), state.ebook[state.current_chapter_index].images[i].image.clone().len());
+                let image_buf = ImageBuf::from_raw(pixels_vec.clone(),
+                                                   ImageFormat::Rgb, state.ebook[state.current_chapter_index].images[i].width,
+                                                   state.ebook[state.current_chapter_index].images[i].height);
+
+                let mut img = Image::new(image_buf).fill_mode(FillStrat::Cover);
+                let mut sized = SizedBox::new(img);
+                //let container = sized.border(Color::grey(0.6), 2.0).center().boxed();
+                c.add_child(sized);
+                i += 1;
+                pixels_vec.clear();
+            } else {
+                let _string = strip_tags(element);
+                let rl = Label::new(_string.clone());
+                println!("{}", _string.clone());
+                c.add_child(rl);
+            }
         }
-        // println!("{}", element);
         //TODO: inserire il contenuto ricavato nei Widget appositi (TextBox o simili e Immagini). Attenzione che per ora si hanno
         // tutti i capitoli, ma all'apertura bisogna mostrare solo il contenuto del primo
-
-        //println!("{}", strip_tags(element));
     }
+
+
+    SizedBox::new(Scroll::new(c).vertical()).expand_height().boxed() //TODO: rimuovere vertical per renderlo scrollabile anche orizzontalmente
+}
 
 /*let mut img = Image::new(png_data).fill_mode(state.fill_strat);
 if state.interpolate {
-    img.set_interpolation_mode(state.interpolation_mode)
+img.set_interpolation_mode(state.interpolation_mode)
 }
 if state.clip {
-    img.set_clip_area(Some(Rect::new(
-        state.clip_x,
-        state.clip_y,
-        state.clip_x + state.clip_width,
-        state.clip_y + state.clip_height,
-    )));
+img.set_clip_area(Some(Rect::new(
+state.clip_x,
+state.clip_y,
+state.clip_x + state.clip_width,
+state.clip_y + state.clip_height,
+)));
 }
 let mut sized = SizedBox::new(img);
 if state.fix_width {
-    sized = sized.fix_width(state.width)
+sized = sized.fix_width(state.width)
 }
 if state.fix_height {
-    sized = sized.fix_height(state.height)
+sized = sized.fix_height(state.height)
 }
 sized.border(Color::grey(0.6), 2.0).center().boxed()*/
-    SizedBox::new(Scroll::new(c).vertical()).expand_height().boxed() //TODO: rimuovere vertical per renderlo scrollabile
-                                                                                // anche orizzontalmente
-}

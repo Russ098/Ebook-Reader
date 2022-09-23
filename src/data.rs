@@ -4,7 +4,7 @@ use druid::{Data, Lens, EventCtx, Env, ArcStr, KeyOrValue, FontFamily, commands,
 use druid::text::{RichText, Attribute};
 use epub::doc::EpubDoc;
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::Path;
 use std::str::from_utf8;
 use druid::im::Vector;
@@ -184,14 +184,16 @@ impl AppDelegate<AppState> for Delegate {
         //}
         //return Handled::Yes;
         //}
+        /*let mut x = 0;
+        let mut v;*/
         if let Some(file_info) = cmd.get(commands::OPEN_FILE) {
             //println!("{}", file_info.path().display());
             match EpubArchive::new(file_info.clone().path())
             {
                 Ok(mut archive) => {
-                    data.current_chapter_index = 0;
+                    data.current_chapter_index = 1;
+                    let mut i = 0;
                     for f in archive.files.clone() {
-                        let mut i = 0;
                         if f.contains("OEBPS") && f.contains("htm.html") {
                             data.ebook.push_back(Chapter::new());
                             //TODO: revisionare una volta fatto il salvataggio (per la questione relativa al segnalibro:
@@ -215,13 +217,21 @@ impl AppDelegate<AppState> for Delegate {
                                                 }
                                             }
                                             let (width, height) = match blob_size(archive.get_entry(s1.clone()).unwrap().as_slice()) {
-                                                Ok(dim) => (dim.width, dim.height),
+                                                Ok(dim) => {/*println!("FILE: {} - W: {} - H: {}", s1, dim.width, dim.height);*/ (dim.width, dim.height)},
                                                 Err(why) => {
                                                     println!("Error getting dimensions: {:?}", why);
                                                     (0, 0)
                                                 }
                                             };
-                                            data.ebook[i].images.push_back(ImageOfChapter::from(Vector::from(archive.get_entry(s1.clone()).unwrap().as_slice()), width, height));
+                                            /*v = archive.get_entry(s1.clone());
+                                            if x == 0{
+                                                if let Ok(mut file) = File::create("img.jpeg") {
+                                                    file.write_all(&v.unwrap().clone().as_slice());
+                                                }
+                                            }*/
+                                            let mut  r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Jpeg).unwrap();
+                                            let result = r.into_bytes();
+                                            data.ebook[i].images.push_back(ImageOfChapter::from(Vector::from(result), width, height));
                                             let resapp = res.as_ref().unwrap()[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].find("<img");
                                             displacement = pos.unwrap() + 3 + app.unwrap() + 5 + displacement;
                                             pos = resapp;

@@ -1,6 +1,6 @@
 use std::array::TryFromSliceError;
 use std::sync::Arc;
-use druid::{widget::{Flex}, Widget, WidgetExt, Color, UnitPoint, FileDialogOptions, FileSpec, lens, Rect, ImageBuf};
+use druid::{widget::{Flex}, Widget, WidgetExt, Color, UnitPoint, FileDialogOptions, FileSpec, lens, Rect, ImageBuf, Vec2};
 use druid::im::Vector;
 use druid::piet::ImageFormat;
 
@@ -82,26 +82,32 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
     // let v2 = state.ebook[state.current_chapter_index].images[i].clone().image;
     let mut v: Vec<u8> = vec![];
     let mut pixels_vec = Vec::new();
-
-
+    let mut image_buf;
 
     if state.ebook.len() > 0 {
         for element in state.ebook[state.current_chapter_index].text.split("\n") {
             if element.contains("img") {
                 println!("Element: {} - i: {}", element, i);
-                println!("{}", state.ebook[state.current_chapter_index].images.len());
+                //println!("{}", state.ebook[state.current_chapter_index].images.len());
                 for pixel in state.ebook[state.current_chapter_index].images[i].image.clone(){
                     pixels_vec.push(pixel);
                 }
                 //println!("len: {} - len2: {}", pixels_vec.len(), state.ebook[state.current_chapter_index].images[i].image.clone().len());
-                let image_buf = ImageBuf::from_raw(pixels_vec.clone(),
-                                                   ImageFormat::Rgb, state.ebook[state.current_chapter_index].images[i].width,
-                                                   state.ebook[state.current_chapter_index].images[i].height);
+                // println!("Pixel len: {} -- Format factor: {}", pixels_vec.len(), ImageFormat::Rgb.bytes_per_pixel());
+                match pixels_vec.len()/(state.ebook[state.current_chapter_index].images[i].width * state.ebook[state.current_chapter_index].images[i].height) {
+                    1 => {image_buf = ImageBuf::from_raw(pixels_vec.clone(), ImageFormat::Grayscale, state.ebook[state.current_chapter_index]
+                        .images[i].width, state.ebook[state.current_chapter_index].images[i].height);},
+                    3 => {image_buf = ImageBuf::from_raw(pixels_vec.clone(), ImageFormat::Rgb, state.ebook[state.current_chapter_index]
+                        .images[i].width, state.ebook[state.current_chapter_index].images[i].height);},
+                    4 =>{image_buf = ImageBuf::from_raw(pixels_vec.clone(), ImageFormat::RgbaPremul, state.ebook[state.current_chapter_index]
+                            .images[i].width, state.ebook[state.current_chapter_index].images[i].height);}
+                    _ => {panic!("Unable to process the image")}
+                }
 
                 let mut img = Image::new(image_buf).fill_mode(FillStrat::Cover);
                 let mut sized = SizedBox::new(img);
-                //let container = sized.border(Color::grey(0.6), 2.0).center().boxed();
-                c.add_child(sized);
+                let container = sized.border(Color::grey(0.6), 2.0).center().boxed();
+                c.add_child(container);
                 i += 1;
                 pixels_vec.clear();
             } else {
@@ -111,12 +117,11 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
                 c.add_child(rl);
             }
         }
-        //TODO: inserire il contenuto ricavato nei Widget appositi (TextBox o simili e Immagini). Attenzione che per ora si hanno
-        // tutti i capitoli, ma all'apertura bisogna mostrare solo il contenuto del primo
     }
 
-
-    SizedBox::new(Scroll::new(c).vertical()).expand_height().boxed() //TODO: rimuovere vertical per renderlo scrollabile anche orizzontalmente
+    let mut scroll = Scroll::new(c);
+    println!("Scroll test: {}", scroll.scroll_by(Vec2::new(0f64, 0f64))); //TODO: risolvere?
+    SizedBox::new(scroll).expand_height().boxed() //TODO: verificare/risolvere(?) se con il mouse sfarfalla scrollando orizzontalmente
 }
 
 /*let mut img = Image::new(png_data).fill_mode(state.fill_strat);

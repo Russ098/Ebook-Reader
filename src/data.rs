@@ -1,5 +1,3 @@
-use std::error::Error;
-use std::fmt::Debug;
 use druid::{Data, Lens, EventCtx, Env, ArcStr, KeyOrValue, FontFamily, commands, AppDelegate, DelegateCtx, Target, Command, Handled, ImageBuf, Widget, WidgetExt, Event, LifeCycleCtx, LifeCycle, UpdateCtx, LayoutCtx, BoxConstraints, Size, PaintCtx, WidgetId};
 use druid::text::{RichText, Attribute};
 use epub::doc::EpubDoc;
@@ -7,6 +5,8 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
 use std::str::from_utf8;
+use dialog::DialogBox;
+use dialog_box::{calender, warning};
 use druid::im::Vector;
 use druid::widget::{Image, SizedBox};
 use epub::archive::EpubArchive;
@@ -159,13 +159,28 @@ impl AppState {
             self.rich_text = RichText::new(ArcStr::from(self.ebook.clone())).with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(new_size)));
         }*/
     }
-    pub fn click_edit_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {}
+    pub fn click_edit_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
+        if data.ebook.len() == 0 {
+            /*dialog::Message::new("The operation was successful.")
+                .title("Success")
+                .show()
+                .expect("Could not display dialog box");*/
+            println!("{}", warning("The warning message you want to display"));
+
+        } else {
+            println!("Ebook non vuoto");
+        }
+    }
 
     pub fn click_save_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {}
 
     pub fn click_single_page_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {}
 
     pub fn click_double_page_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {}
+
+    pub fn click_previous_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {}
+
+    pub fn click_next_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {}
 }
 
 pub struct Delegate;
@@ -187,6 +202,7 @@ impl AppDelegate<AppState> for Delegate {
         //}
         /*let mut x = 0;
         let mut v;*/
+
         if let Some(file_info) = cmd.get(commands::OPEN_FILE) {
             //println!("{}", file_info.path().display());
             match EpubArchive::new(file_info.clone().path())

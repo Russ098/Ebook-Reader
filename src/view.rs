@@ -5,7 +5,7 @@ use druid::im::Vector;
 use druid::piet::ImageFormat;
 
 use crate::data::*;
-use druid::widget::{TextBox, Button, RawLabel, Scroll, SizedBox, LensWrap, Image, FillStrat, Label};
+use druid::widget::{TextBox, Button, RawLabel, Scroll, SizedBox, LensWrap, Image, FillStrat, Label, CrossAxisAlignment};
 use imagesize::size;
 use voca_rs::strip::strip_tags;
 use voca_rs::Voca;
@@ -34,11 +34,25 @@ fn option_row() -> impl Widget<AppState> {
     });
     let edit_button = Button::new("Edit").padding(5.0).on_click(AppState::click_edit_button);
     let save_button = Button::new("Save").padding(5.0).on_click(AppState::click_save_button);
-    Flex::row()
+    let previous_button = Button::new("Previous page").padding(5.0).on_click(AppState::click_previous_button);
+    let next_button = Button::new("Next Page").padding(5.0).on_click(AppState::click_next_button);
+
+    let r1 = Flex::row()
         .with_child(open_button)
         .with_child(edit_button)
         .with_child(save_button)
-        .align_left()
+        .align_left();
+
+    let r2 = Flex::row()
+        .with_child(previous_button)
+        .with_child(next_button)
+        .align_right();
+
+
+    Flex::row()
+        .with_flex_child(r1, 1.0)
+        .with_flex_child(r2, 1.0)
+        .expand_width()
         .background(Color::WHITE)
         .border(Color::GRAY, 0.5)
 }
@@ -79,7 +93,6 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
     let mut c = Flex::column();
     let mut src = "".to_string();
     let mut i = 0 as usize;
-    // let v2 = state.ebook[state.current_chapter_index].images[i].clone().image;
     let mut v: Vec<u8> = vec![];
     let mut pixels_vec = Vec::new();
     let mut image_buf;
@@ -120,7 +133,7 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
     }
 
     let mut scroll = Scroll::new(c);
-    println!("Scroll test: {}", scroll.scroll_by(Vec2::new(0f64, 0f64))); //TODO: risolvere?
+    println!("Scroll test: {}", /*scroll.child_size()*/scroll.scroll_by(Vec2::new(0_f64, 10_f64))); //TODO: risolvere?
     SizedBox::new(scroll).expand_height().boxed() //TODO: verificare/risolvere(?) se con il mouse sfarfalla scrollando orizzontalmente
 }
 

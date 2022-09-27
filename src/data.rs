@@ -5,13 +5,13 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
 use std::str::from_utf8;
-use dialog::DialogBox;
-use dialog_box::{calender, warning};
 use druid::im::Vector;
 use druid::widget::{Image, SizedBox};
 use epub::archive::EpubArchive;
 use imagesize::{size, ImageSize, blob_size};
 use druid::piet::ImageFormat;
+use image::imageops::resize;
+use native_dialog::{MessageDialog, MessageType};
 use voca_rs::Voca;
 use crate::view::build_widget;
 
@@ -161,26 +161,93 @@ impl AppState {
     }
     pub fn click_edit_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         if data.ebook.len() == 0 {
-            /*dialog::Message::new("The operation was successful.")
-                .title("Success")
-                .show()
-                .expect("Could not display dialog box");*/
-            println!("{}", warning("The warning message you want to display"));
+            let dialog = MessageDialog::new()
+                .set_type(MessageType::Info)
+                .set_text("Please select an Ebook to enable this function.")
+                .set_title("Ebook not selected")
+                .show_alert();
 
         } else {
+            //TODO: Fare la vera funzione
+
             println!("Ebook non vuoto");
         }
     }
 
-    pub fn click_save_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {}
+    pub fn click_save_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
+        if data.ebook.len() == 0 {
+            let dialog = MessageDialog::new()
+                .set_type(MessageType::Info)
+                .set_text("Please select an Ebook to enable this function.")
+                .set_title("Ebook not selected")
+                .show_alert();
 
-    pub fn click_single_page_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {}
+        } else {
+            //TODO: Fare la vera funzione
 
-    pub fn click_double_page_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {}
+            println!("Ebook non vuoto");
+        }
+    }
 
-    pub fn click_previous_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {}
+    pub fn click_single_page_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
+        if data.ebook.len() == 0 {
+            let dialog = MessageDialog::new()
+                .set_type(MessageType::Info)
+                .set_text("Please select an Ebook to enable this function.")
+                .set_title("Ebook not selected")
+                .show_alert();
 
-    pub fn click_next_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {}
+        } else {
+            //TODO: Fare la vera funzione
+
+            println!("Ebook non vuoto");
+        }
+    }
+
+    pub fn click_double_page_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
+        if data.ebook.len() == 0 {
+            let dialog = MessageDialog::new()
+                .set_type(MessageType::Info)
+                .set_text("Please select an Ebook to enable this function.")
+                .set_title("Ebook not selected")
+                .show_alert();
+
+        } else {
+            //TODO: Fare la vera funzione
+
+            println!("Ebook non vuoto");
+        }
+    }
+
+    pub fn click_previous_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
+        if data.ebook.len() == 0 {
+            let dialog = MessageDialog::new()
+                .set_type(MessageType::Info)
+                .set_text("Please select an Ebook to enable this function.")
+                .set_title("Ebook not selected")
+                .show_alert();
+
+        } else {
+            //TODO: Fare la vera funzione
+
+            println!("Ebook non vuoto");
+        }
+    }
+
+    pub fn click_next_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
+        if data.ebook.len() == 0 {
+            let dialog = MessageDialog::new()
+                .set_type(MessageType::Info)
+                .set_text("Please select an Ebook to enable this function.")
+                .set_title("Ebook not selected")
+                .show_alert();
+
+        } else {
+            //TODO: Fare la vera funzione
+
+            println!("Ebook non vuoto");
+        }
+    }
 }
 
 pub struct Delegate;

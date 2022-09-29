@@ -1,11 +1,12 @@
 use std::array::TryFromSliceError;
 use std::sync::Arc;
-use druid::{widget::{Flex}, Widget, WidgetExt, Color, UnitPoint, FileDialogOptions, FileSpec, lens, Rect, ImageBuf, Vec2};
+use druid::{widget::{Flex}, Widget, WidgetExt, Color, UnitPoint, FileDialogOptions, FileSpec, lens, Rect, ImageBuf, Vec2, KeyOrValue, Size, TextAlignment};
 use druid::im::Vector;
 use druid::piet::ImageFormat;
+use druid::text::RichText;
 
 use crate::data::*;
-use druid::widget::{TextBox, Button, RawLabel, Scroll, SizedBox, LensWrap, Image, FillStrat, Label, CrossAxisAlignment};
+use druid::widget::{TextBox, Button, RawLabel, Scroll, SizedBox, LensWrap, Image, FillStrat, Label, CrossAxisAlignment, LineBreaking, Padding};
 use imagesize::size;
 use voca_rs::strip::strip_tags;
 use voca_rs::Voca;
@@ -34,7 +35,7 @@ fn option_row() -> impl Widget<AppState> {
     });
     let edit_button = Button::new("Edit").padding(5.0).on_click(AppState::click_edit_button);
     let save_button = Button::new("Save").padding(5.0).on_click(AppState::click_save_button);
-    let previous_button = Button::new("Previous page").padding(5.0).on_click(AppState::click_previous_button);
+    let previous_button = Button::new("Previous Page").padding(5.0).on_click(AppState::click_previous_button);
     let next_button = Button::new("Next Page").padding(5.0).on_click(AppState::click_next_button);
 
     let r1 = Flex::row()
@@ -80,7 +81,7 @@ fn settings_row() -> impl Widget<AppState> {
 pub fn build_ui() -> impl Widget<AppState> {
     let mut c = Flex::column();
     c.add_child(option_row());
-    c.add_flex_child(Rebuilder::new().center(), 1.0);
+    c.add_flex_child(Rebuilder::new(), 1.0);
     c.add_child(settings_row());
     return c;
 }
@@ -100,7 +101,7 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
     if state.ebook.len() > 0 {
         for element in state.ebook[state.current_chapter_index].text.split("\n") {
             if element.contains("img") {
-                println!("Element: {} - i: {}", element, i);
+                //println!("Element: {} - i: {}", element, i);
                 //println!("{}", state.ebook[state.current_chapter_index].images.len());
                 for pixel in state.ebook[state.current_chapter_index].images[i].image.clone(){
                     pixels_vec.push(pixel);
@@ -118,23 +119,30 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
                 }
 
                 let mut img = Image::new(image_buf).fill_mode(FillStrat::Cover);
-                let mut sized = SizedBox::new(img);
+                let mut sized = SizedBox::new(img).fix_size(state.ebook[state.current_chapter_index].images[i].width as f64 * (state.font_size.clone().parse::<f64>().unwrap()/40.) ,
+                                                            state.ebook[state.current_chapter_index].images[i].height as f64 * (state.font_size.clone().parse::<f64>().unwrap()/40.) );
                 let container = sized.border(Color::grey(0.6), 2.0).center().boxed();
+
                 c.add_child(container);
                 i += 1;
                 pixels_vec.clear();
             } else {
-                let _string = strip_tags(element);
-                let rl = Label::new(_string.clone());
-                println!("{}", _string.clone());
+
+                let mut _string = strip_tags(element);
+                let rl = Label::new(_string.clone())
+                    .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
+                    .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size);
+                //println!("Dimensione altezza: {} larghezza:{}", dimensions.height, dimensions.width);
+                //println!("{}", _string.clone());
                 c.add_child(rl);
             }
         }
     }
 
-    let mut scroll = Scroll::new(c);
-    println!("Scroll test: {}", /*scroll.child_size()*/scroll.scroll_by(Vec2::new(0_f64, 10_f64))); //TODO: risolvere?
-    SizedBox::new(scroll).expand_height().boxed() //TODO: verificare/risolvere(?) se con il mouse sfarfalla scrollando orizzontalmente
+    let mut scroll = Scroll::new(c).vertical();
+    //println!("Scroll test: {}", /*scroll.child_size()*/scroll.scroll_by(Vec2::new(0_f64, 10_f64))); //TODO: risolvere?
+    let padding = Padding::new((50.0, 10.), scroll);
+    SizedBox::new(padding).expand_height().boxed() //TODO: verificare/risolvere(?) se con il mouse sfarfalla scrollando orizzontalmente
 }
 
 /*let mut img = Image::new(png_data).fill_mode(state.fill_strat);

@@ -1,10 +1,11 @@
-use druid::{Data, Lens, EventCtx, Env, ArcStr, KeyOrValue, FontFamily, commands, AppDelegate, DelegateCtx, Target, Command, Handled, ImageBuf, Widget, WidgetExt, Event, LifeCycleCtx, LifeCycle, UpdateCtx, LayoutCtx, BoxConstraints, Size, PaintCtx, WidgetId};
+use druid::{Data, Lens, EventCtx, Env, ArcStr, KeyOrValue, FontFamily, commands, AppDelegate, DelegateCtx, Target, Command, Handled, ImageBuf, Widget, WidgetExt, Event, LifeCycleCtx, LifeCycle, UpdateCtx, LayoutCtx, BoxConstraints, Size, PaintCtx, WidgetId, WindowHandle};
 use druid::text::{RichText, Attribute};
 use epub::doc::EpubDoc;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
 use std::str::from_utf8;
+use druid::Event::WindowSize;
 use druid::im::Vector;
 use druid::widget::{Image, SizedBox};
 use epub::archive::EpubArchive;
@@ -44,22 +45,28 @@ impl ImageOfChapter {
 
 pub struct Rebuilder {
     inner: Box<dyn Widget<AppState>>,
+    window_size: f64,
 }
 
 impl Rebuilder {
     pub fn new() -> Rebuilder {
         Rebuilder {
             inner: SizedBox::empty().boxed(),
+            window_size: 1100.,
         }
     }
 
     fn rebuild_inner(&mut self, data: &AppState) {
+            println!("window rebuilder: {}", self.window_size);
             self.inner = build_widget(data);
     }
 }
 
 impl Widget<AppState> for Rebuilder {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut AppState, env: &Env) {
+        if(data.window_size != self.window_size ){
+            data.window_size = self.window_size;
+        }
         self.inner.event(ctx, event, data, env)
     }
 
@@ -84,6 +91,8 @@ impl Widget<AppState> for Rebuilder {
         data: &AppState,
         env: &Env,
     ) -> Size {
+        self.window_size = ctx.window().get_size().width;
+        println!("Layout size {}", self.window_size);
         self.inner.layout(ctx, bc, data, env)
     }
 
@@ -121,9 +130,9 @@ impl Chapter {
 #[derive(Clone, Data, Lens)]
 pub struct AppState {
     pub font_size: String,
-    rich_text: RichText,
     pub ebook: Vector<Chapter>,
     pub current_chapter_index: usize,
+    pub window_size: f64,
 }
 
 impl AppState {
@@ -131,9 +140,13 @@ impl AppState {
         Self {
             font_size: SIZE_FONT.to_string(),
             ebook: Vector::<Chapter>::new(),
-            rich_text: RichText::new(ArcStr::from("prova")).with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(40.))),
             current_chapter_index: 0,
+            window_size: 1100.,
         }
+    }
+
+    pub fn setWindowSize(&mut self,size : f64){
+        self.window_size = size;
     }
     pub fn click_plus_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         data.plus();
@@ -302,7 +315,7 @@ impl AppDelegate<AppState> for Delegate {
                                                 }
                                             }
                                             let (width, height) = match blob_size(archive.get_entry(s1.clone()).unwrap().as_slice()) {
-                                                Ok(dim) => {println!("FILE: {} - W: {} - H: {}", s1, dim.width, dim.height); (dim.width, dim.height)},
+                                                Ok(dim) => {(dim.width, dim.height)},
                                                 Err(why) => {
                                                     println!("Error getting dimensions: {:?}", why);
                                                     (0, 0)

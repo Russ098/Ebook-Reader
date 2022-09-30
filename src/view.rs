@@ -86,8 +86,8 @@ pub fn build_ui() -> impl Widget<AppState> {
     return c;
 }
 
-//TODO: creare una nuova fz che implementi Widget<AppState> e che si modifichi in base al contenuto del Vector (contenuto nella "nuova"
-// struct in data.rs) andando a creare Widget::Image (per le immagini) e Widget::RawLabel (o Label) per il testo
+//TODO: Aggiustare il controllo per la dimensione del font quando viene messa a 0 oppure cancellata dall'utente
+
 pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
     //titolo(?), testo, immagini
     //SizedBox::new(Scroll::new(RawLabel::new().lens(AppState::rich_text))).expand_height()
@@ -98,37 +98,54 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
     let mut pixels_vec = Vec::new();
     let mut image_buf;
 
+    //TODO: Per i file .html che non presentano all'interno un "pageno", la pagina cambia ogni volta che cambia il file html che viene aperto.
+    // Altrimenti la pagina viene riempita fin quando non si incontra un tag span che contiene "pageno".
+    // NOTA: se il file .html corrente possiede del testo che non è seguito da un pageno, allora si controllerà il successivo file .html e, se contiene un pageno, si continuerà a
+    // riempire, altrimenti si scriverà su una nuova pagina il file nuovo .html. DA SALVARE: Numero di pagina, indice di lettura (indice in cui ci troviamo all'interno del file),
+    // numero del capitolo, eventuali flag da usare
+
+
     if state.ebook.len() > 0 {
         for element in state.ebook[state.current_chapter_index].text.split("\n") {
             if element.contains("img") {
                 //println!("Element: {} - i: {}", element, i);
                 //println!("{}", state.ebook[state.current_chapter_index].images.len());
-                for pixel in state.ebook[state.current_chapter_index].images[i].image.clone(){
+                for pixel in state.ebook[state.current_chapter_index].images[i].image.clone() {
                     pixels_vec.push(pixel);
                 }
                 //println!("len: {} - len2: {}", pixels_vec.len(), state.ebook[state.current_chapter_index].images[i].image.clone().len());
                 // println!("Pixel len: {} -- Format factor: {}", pixels_vec.len(), ImageFormat::Rgb.bytes_per_pixel());
-                match pixels_vec.len()/(state.ebook[state.current_chapter_index].images[i].width * state.ebook[state.current_chapter_index].images[i].height) {
-                    1 => {image_buf = ImageBuf::from_raw(pixels_vec.clone(), ImageFormat::Grayscale, state.ebook[state.current_chapter_index]
-                        .images[i].width, state.ebook[state.current_chapter_index].images[i].height);},
-                    3 => {image_buf = ImageBuf::from_raw(pixels_vec.clone(), ImageFormat::Rgb, state.ebook[state.current_chapter_index]
-                        .images[i].width, state.ebook[state.current_chapter_index].images[i].height);},
-                    4 =>{image_buf = ImageBuf::from_raw(pixels_vec.clone(), ImageFormat::RgbaPremul, state.ebook[state.current_chapter_index]
-                            .images[i].width, state.ebook[state.current_chapter_index].images[i].height);}
-                    _ => {panic!("Unable to process the image")}
+                match pixels_vec.len() / (state.ebook[state.current_chapter_index].images[i].width * state.ebook[state.current_chapter_index].images[i].height) {
+                    1 => {
+                        image_buf = ImageBuf::from_raw(pixels_vec.clone(), ImageFormat::Grayscale, state.ebook[state.current_chapter_index]
+                            .images[i].width, state.ebook[state.current_chapter_index].images[i].height);
+                    }
+                    3 => {
+                        image_buf = ImageBuf::from_raw(pixels_vec.clone(), ImageFormat::Rgb, state.ebook[state.current_chapter_index]
+                            .images[i].width, state.ebook[state.current_chapter_index].images[i].height);
+                    }
+                    4 => {
+                        image_buf = ImageBuf::from_raw(pixels_vec.clone(), ImageFormat::RgbaPremul, state.ebook[state.current_chapter_index]
+                            .images[i].width, state.ebook[state.current_chapter_index].images[i].height);
+                    }
+                    _ => { panic!("Unable to process the image") }
                 }
 
-                let mut img = Image::new(image_buf).fill_mode(FillStrat::Cover);
-                let mut sized = SizedBox::new(img).fix_size(state.ebook[state.current_chapter_index].images[i].width as f64 * (state.font_size.clone().parse::<f64>().unwrap()/40.) ,
-                                                            state.ebook[state.current_chapter_index].images[i].height as f64 * (state.font_size.clone().parse::<f64>().unwrap()/40.) );
+
+                let mut img = Image::new(image_buf.clone()).fill_mode(FillStrat::Fill);
+
+
+                let mut sized = SizedBox::new(img).fix_size(image_buf.width().clone() as f64 * (state.font_size.clone().parse::<f64>().unwrap() / 40.),
+                                                    image_buf.height().clone() as f64 * (state.font_size.clone().parse::<f64>().unwrap() / 40.));
+
                 let container = sized.border(Color::grey(0.6), 2.0).center().boxed();
 
                 c.add_child(container);
                 i += 1;
                 pixels_vec.clear();
             } else {
-
                 let mut _string = strip_tags(element);
+
                 let rl = Label::new(_string.clone())
                     .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
                     .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size);
@@ -140,28 +157,6 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
     }
 
     let mut scroll = Scroll::new(c).vertical();
-    //println!("Scroll test: {}", /*scroll.child_size()*/scroll.scroll_by(Vec2::new(0_f64, 10_f64))); //TODO: risolvere?
     let padding = Padding::new((50.0, 10.), scroll);
-    SizedBox::new(padding).expand_height().boxed() //TODO: verificare/risolvere(?) se con il mouse sfarfalla scrollando orizzontalmente
+    SizedBox::new(padding).expand_height().boxed()
 }
-
-/*let mut img = Image::new(png_data).fill_mode(state.fill_strat);
-if state.interpolate {
-img.set_interpolation_mode(state.interpolation_mode)
-}
-if state.clip {
-img.set_clip_area(Some(Rect::new(
-state.clip_x,
-state.clip_y,
-state.clip_x + state.clip_width,
-state.clip_y + state.clip_height,
-)));
-}
-let mut sized = SizedBox::new(img);
-if state.fix_width {
-sized = sized.fix_width(state.width)
-}
-if state.fix_height {
-sized = sized.fix_height(state.height)
-}
-sized.border(Color::grey(0.6), 2.0).center().boxed()*/

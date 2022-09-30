@@ -57,7 +57,6 @@ impl Rebuilder {
     }
 
     fn rebuild_inner(&mut self, data: &AppState) {
-            println!("window rebuilder: {}", self.window_size);
             self.inner = build_widget(data);
     }
 }
@@ -92,7 +91,6 @@ impl Widget<AppState> for Rebuilder {
         env: &Env,
     ) -> Size {
         self.window_size = ctx.window().get_size().width;
-        println!("Layout size {}", self.window_size);
         self.inner.layout(ctx, bc, data, env)
     }
 

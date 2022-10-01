@@ -106,27 +106,33 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
 
 
     if state.ebook.len() > 0 {
-        for element in state.ebook[state.current_chapter_index].text.split("\n") {
+        /*
+        if state.ebook[state.current_page].text.contains("pageno"){
+            //controllo per vedere se il file html aperto è suddiviso in più pagine
+            pageno_found = true;
+        }*/
+        for element in state.ebook[state.current_page].text.split("\n") {
+            println!("Element: {}", element);
             if element.contains("img") {
                 //println!("Element: {} - i: {}", element, i);
                 //println!("{}", state.ebook[state.current_chapter_index].images.len());
-                for pixel in state.ebook[state.current_chapter_index].images[i].image.clone() {
+                for pixel in state.ebook[state.current_page].images[i].image.clone() {
                     pixels_vec.push(pixel);
                 }
                 //println!("len: {} - len2: {}", pixels_vec.len(), state.ebook[state.current_chapter_index].images[i].image.clone().len());
                 // println!("Pixel len: {} -- Format factor: {}", pixels_vec.len(), ImageFormat::Rgb.bytes_per_pixel());
-                match pixels_vec.len() / (state.ebook[state.current_chapter_index].images[i].width * state.ebook[state.current_chapter_index].images[i].height) {
+                match pixels_vec.len() / (state.ebook[state.current_page].images[i].width * state.ebook[state.current_page].images[i].height) {
                     1 => {
-                        image_buf = ImageBuf::from_raw(pixels_vec.clone(), ImageFormat::Grayscale, state.ebook[state.current_chapter_index]
-                            .images[i].width, state.ebook[state.current_chapter_index].images[i].height);
+                        image_buf = ImageBuf::from_raw(pixels_vec.clone(), ImageFormat::Grayscale, state.ebook[state.current_page]
+                            .images[i].width, state.ebook[state.current_page].images[i].height);
                     }
                     3 => {
-                        image_buf = ImageBuf::from_raw(pixels_vec.clone(), ImageFormat::Rgb, state.ebook[state.current_chapter_index]
-                            .images[i].width, state.ebook[state.current_chapter_index].images[i].height);
+                        image_buf = ImageBuf::from_raw(pixels_vec.clone(), ImageFormat::Rgb, state.ebook[state.current_page]
+                            .images[i].width, state.ebook[state.current_page].images[i].height);
                     }
                     4 => {
-                        image_buf = ImageBuf::from_raw(pixels_vec.clone(), ImageFormat::RgbaPremul, state.ebook[state.current_chapter_index]
-                            .images[i].width, state.ebook[state.current_chapter_index].images[i].height);
+                        image_buf = ImageBuf::from_raw(pixels_vec.clone(), ImageFormat::RgbaPremul, state.ebook[state.current_page]
+                            .images[i].width, state.ebook[state.current_page].images[i].height);
                     }
                     _ => { panic!("Unable to process the image") }
                 }

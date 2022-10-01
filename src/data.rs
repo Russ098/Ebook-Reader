@@ -292,18 +292,19 @@ impl AppDelegate<AppState> for Delegate {
                             let res = archive.get_entry_as_str(f);
 
                             if res.is_ok() {
-                                let page_occ = res.as_ref().unwrap().matches("<span class=\"x-ebookmaker-pageno\"").count();
+                                let init = res.as_ref().unwrap().find("<body");
+                                let page_occ = res.as_ref().unwrap()[init.unwrap()..].matches("<span class=\"x-ebookmaker-pageno\"").count();
 
                                 if page_occ > 0 {
                                     //controllo per vedere se il file html aperto è suddiviso in più pagine
                                     pageno_found = true;
-                                    let mut pos_pageno = res.as_ref().unwrap().find("<span class=\"x-ebookmaker-pageno\"");
+                                    let mut pos_pageno = res.as_ref().unwrap()[init.unwrap()..].find("<span class=\"x-ebookmaker-pageno\"");
 
                                     for i in 0..page_occ {
 
                                         if page_not_ended {
 
-                                            let text = res.as_ref().unwrap()._substr(0 , pos_pageno.unwrap());
+                                            let text = res.as_ref().unwrap()[init.unwrap()..]._substr(0 , pos_pageno.unwrap());
                                             let img_occ = text.matches("<img").count();
                                             let mut pos = text.find("<img");
                                             if img_occ > 0 {
@@ -368,7 +369,7 @@ impl AppDelegate<AppState> for Delegate {
                                         if i == page_occ - 1 {
 
                                             page_not_ended = true;
-                                            let text = res.as_ref().unwrap()._substr(pos_pageno.unwrap(), res.as_ref().unwrap().len());
+                                            let text = res.as_ref().unwrap()[init.unwrap()..]._substr(pos_pageno.unwrap(), res.as_ref().unwrap().len());
                                             let img_occ = text.matches("<img").count();
                                             let mut pos = text.find("<img");
                                             if img_occ > 0 {
@@ -432,7 +433,7 @@ impl AppDelegate<AppState> for Delegate {
                                         } else {
 
                                             let next_page = res.as_ref().unwrap()[pos_pageno.unwrap() + 34 ..].find("<span class=\"x-ebookmaker-pageno\"");
-                                            let text = res.as_ref().unwrap()._substr(pos_pageno.unwrap(), next_page.unwrap());
+                                            let text = res.as_ref().unwrap()[init.unwrap()..]._substr(pos_pageno.unwrap(), next_page.unwrap());
                                             let img_occ = text.matches("<img").count();
                                             let mut pos = text.find("<img");
                                             if img_occ > 0 {
@@ -505,8 +506,8 @@ impl AppDelegate<AppState> for Delegate {
                                 // quando chiudo l'app, la prossima riapertura mi riporta all'ultima pagina letta (?))
                                 // let res = archive.get_entry_as_str(f);
                                 else {
-                                    let img_occ = res.as_ref().unwrap().matches("<img").count();
-                                    let mut pos = res.as_ref().unwrap().find("<img");
+                                    let img_occ = res.as_ref().unwrap()[init.unwrap()..].matches("<img").count();
+                                    let mut pos = res.as_ref().unwrap()[init.unwrap()..].find("<img");
                                     if img_occ > 0 {
                                         if pos.is_some() {
                                             let mut displacement: usize = 0;

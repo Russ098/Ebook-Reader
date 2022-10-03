@@ -112,7 +112,6 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
             pageno_found = true;
         }*/
         for element in state.ebook[state.current_page].text.split("\n") {
-            println!("Element: {}", element);
             if element.contains("img") {
                 //println!("Element: {} - i: {}", element, i);
                 //println!("{}", state.ebook[state.current_chapter_index].images.len());
@@ -150,7 +149,22 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
                 i += 1;
                 pixels_vec.clear();
             } else {
-                let mut _string = strip_tags(element);
+                let mut _string;
+
+                let mut appStr = element.to_string();
+
+                if appStr.len() >= 1{
+                    if appStr.chars().last().unwrap()== '<'{
+                        appStr.replace_range(appStr.len()-1..,"");
+                    }
+                }
+
+
+
+                println!("appStr {}",appStr);
+                _string = strip_tags(appStr.as_str());
+
+
 
                 let rl = Label::new(_string.clone())
                     .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))

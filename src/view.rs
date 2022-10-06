@@ -97,6 +97,8 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
     let mut v: Vec<u8> = vec![];
     let mut pixels_vec = Vec::new();
     let mut image_buf;
+    let mut scroll;
+    let mut c2 = Flex::column();
 
     //TODO: Per i file .html che non presentano all'interno un "pageno", la pagina cambia ogni volta che cambia il file html che viene aperto.
     // Altrimenti la pagina viene riempita fin quando non si incontra un tag span che contiene "pageno".
@@ -106,20 +108,23 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
 
 
     if state.ebook.len() > 0 {
-        /*
-        if state.ebook[state.current_page].text.contains("pageno"){
-            //controllo per vedere se il file html aperto è suddiviso in più pagine
-            pageno_found = true;
-        }*/
+
+
+        let mut str_page = String::new();
+        str_page.push_str(state.current_page.to_string().as_str());
+        str_page.push_str("\n\n");
+        let rl_page = Label::new(str_page)
+            .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
+            .with_text_alignment(TextAlignment::Center)
+            .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size);
+
+        c.add_child(rl_page);
+
         for element in state.ebook[state.current_page].text.split("\n") {
             if element.contains("img") {
-                //println!("Element: {} - i: {}", element, i);
-                //println!("{}", state.ebook[state.current_chapter_index].images.len());
                 for pixel in state.ebook[state.current_page].images[i].image.clone() {
                     pixels_vec.push(pixel);
                 }
-                //println!("len: {} - len2: {}", pixels_vec.len(), state.ebook[state.current_chapter_index].images[i].image.clone().len());
-                // println!("Pixel len: {} -- Format factor: {}", pixels_vec.len(), ImageFormat::Rgb.bytes_per_pixel());
                 match pixels_vec.len() / (state.ebook[state.current_page].images[i].width * state.ebook[state.current_page].images[i].height) {
                     1 => {
                         image_buf = ImageBuf::from_raw(pixels_vec.clone(), ImageFormat::Grayscale, state.ebook[state.current_page]
@@ -141,7 +146,7 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
 
 
                 let mut sized = SizedBox::new(img).fix_size(image_buf.width().clone() as f64 * (state.font_size.clone().parse::<f64>().unwrap() / 40.),
-                                                    image_buf.height().clone() as f64 * (state.font_size.clone().parse::<f64>().unwrap() / 40.));
+                                                            image_buf.height().clone() as f64 * (state.font_size.clone().parse::<f64>().unwrap() / 40.));
 
                 let container = sized.border(Color::grey(0.6), 2.0).center().boxed();
 
@@ -153,30 +158,107 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
 
                 let mut appStr = element.to_string();
 
-                if appStr.len() >= 1{
-                    if appStr.chars().last().unwrap()== '<'{
-                        appStr.replace_range(appStr.len()-1..,"");
+                if appStr.len() >= 1 {
+                    if appStr.chars().last().unwrap() == '<' {
+                        appStr.replace_range(appStr.len() - 1.., "");
                     }
                 }
 
-
-
-                println!("appStr {}",appStr);
                 _string = strip_tags(appStr.as_str());
-
 
 
                 let rl = Label::new(_string.clone())
                     .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
                     .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size);
-                //println!("Dimensione altezza: {} larghezza:{}", dimensions.height, dimensions.width);
-                //println!("{}", _string.clone());
+
                 c.add_child(rl);
+            }
+        }
+
+        if state.double_page {
+            if state.current_page + 1 < state.ebook.len() {
+
+
+                let mut str_page = String::new();
+                str_page.push_str((state.current_page + 1).to_string().as_str());
+                str_page.push_str("\n\n");
+                let rl_page = Label::new(str_page)
+                    .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
+                    .with_text_alignment(TextAlignment::Center)
+                    .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size);
+
+                c2.add_child(rl_page);
+
+
+                for element in state.ebook[state.current_page + 1].text.split("\n") {
+                    if element.contains("img") {
+                        for pixel in state.ebook[state.current_page + 1].images[i].image.clone() {
+                            pixels_vec.push(pixel);
+                        }
+                        match pixels_vec.len() / (state.ebook[state.current_page + 1].images[i].width * state.ebook[state.current_page + 1].images[i].height) {
+                            1 => {
+                                image_buf = ImageBuf::from_raw(pixels_vec.clone(), ImageFormat::Grayscale, state.ebook[state.current_page + 1]
+                                    .images[i].width, state.ebook[state.current_page + 1].images[i].height);
+                            }
+                            3 => {
+                                image_buf = ImageBuf::from_raw(pixels_vec.clone(), ImageFormat::Rgb, state.ebook[state.current_page + 1]
+                                    .images[i].width, state.ebook[state.current_page + 1].images[i].height);
+                            }
+                            4 => {
+                                image_buf = ImageBuf::from_raw(pixels_vec.clone(), ImageFormat::RgbaPremul, state.ebook[state.current_page + 1]
+                                    .images[i].width, state.ebook[state.current_page + 1].images[i].height);
+                            }
+                            _ => { panic!("Unable to process the image") }
+                        }
+
+
+                        let mut img = Image::new(image_buf.clone()).fill_mode(FillStrat::Fill);
+
+
+                        let mut sized = SizedBox::new(img).fix_size(image_buf.width().clone() as f64 * (state.font_size.clone().parse::<f64>().unwrap() / 40.),
+                                                                    image_buf.height().clone() as f64 * (state.font_size.clone().parse::<f64>().unwrap() / 40.));
+
+                        let container = sized.border(Color::grey(0.6), 2.0).center().boxed();
+
+                        c2.add_child(container);
+                        i += 1;
+                        pixels_vec.clear();
+                    } else {
+                        let mut _string;
+
+                        let mut appStr = element.to_string();
+
+                        if appStr.len() >= 1 {
+                            if appStr.chars().last().unwrap() == '<' {
+                                appStr.replace_range(appStr.len() - 1.., "");
+                            }
+                        }
+
+                        _string = strip_tags(appStr.as_str());
+
+
+                        let rl = Label::new(_string.clone())
+                            .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
+                            .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size);
+
+                        c2.add_child(rl);
+                    }
+                }
             }
         }
     }
 
-    let mut scroll = Scroll::new(c).vertical();
+    if state.double_page {
+        let mut c3 = Flex::row();
+        c3.add_flex_child(c.cross_axis_alignment(CrossAxisAlignment::Start), 1.0);
+        c3.add_flex_child(c2.cross_axis_alignment(CrossAxisAlignment::Start), 1.0);
+
+        scroll = Scroll::new(c3.cross_axis_alignment(CrossAxisAlignment::Start)).vertical();
+    } else {
+        scroll = Scroll::new(c.cross_axis_alignment(CrossAxisAlignment::Start)).vertical();
+    }
+
+
     let padding = Padding::new((50.0, 10.), scroll);
     SizedBox::new(padding).expand_height().boxed()
 }

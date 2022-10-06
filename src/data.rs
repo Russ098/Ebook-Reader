@@ -131,6 +131,7 @@ pub struct AppState {
     pub ebook: Vector<Page>,
     pub current_page: usize,
     pub window_size: f64,
+    pub double_page: bool,
 }
 
 impl AppState {
@@ -140,6 +141,7 @@ impl AppState {
             ebook: Vector::<Page>::new(),
             current_page: 0,
             window_size: 1100.,
+            double_page: false,
         }
     }
 
@@ -204,8 +206,7 @@ impl AppState {
                 .show_alert();
         } else {
             //TODO: Fare la vera funzione
-
-            println!("Ebook non vuoto");
+            data.double_page = false;
         }
     }
 
@@ -218,8 +219,7 @@ impl AppState {
                 .show_alert();
         } else {
             //TODO: Fare la vera funzione
-
-            println!("Ebook non vuoto");
+            data.double_page = true;
         }
     }
 
@@ -234,10 +234,15 @@ impl AppState {
         } else {
             //TODO: Fare la vera funzione
 
-            if data.current_page != 0 {
-                data.current_page -= 1;
+            if data.double_page{
+                if data.current_page > 1 {
+                    data.current_page -= 2;
+                }
+            }else{
+                if data.current_page > 0 {
+                    data.current_page -= 1;
+                }
             }
-
         }
     }
 
@@ -251,10 +256,15 @@ impl AppState {
         } else {
             //TODO: Fare la vera funzione
 
-            if data.current_page < (data.ebook.len()-1) {
-                data.current_page += 1;
+            if data.double_page{
+                if data.current_page < (data.ebook.len() - 2) {
+                    data.current_page += 2;
+                }
+            }else{
+                if data.current_page < (data.ebook.len() - 1) {
+                    data.current_page += 1;
+                }
             }
-
         }
     }
 }
@@ -291,7 +301,6 @@ impl AppDelegate<AppState> for Delegate {
 
 
                     for f in archive.files.clone() {
-
                         if f.contains("OEBPS") && f.contains("htm.html") {
                             data.ebook.push_back(Page::new());
 
@@ -304,7 +313,7 @@ impl AppDelegate<AppState> for Delegate {
 
                                 if page_occ > 0 {
                                     let mut pos_pageno = res.as_ref().unwrap()[init.unwrap()..].find("<span class=\"x-ebookmaker-pageno\"").unwrap();
-                                    let mut text = res.as_ref().unwrap()[init.unwrap()..]._substr(0 , pos_pageno);
+                                    let mut text = res.as_ref().unwrap()[init.unwrap()..]._substr(0, pos_pageno);
                                     let mut img_occ = text.matches("<img").count();
                                     let mut pos = text.find("<img");
                                     if img_occ > 0 {
@@ -355,8 +364,8 @@ impl AppDelegate<AppState> for Delegate {
                                                 }
                                                 let result = r.into_bytes();
                                                 if page_not_ended {
-                                                    data.ebook[page_no-1].images.push_back(ImageOfPage::from(Vector::from(result), width, height));
-                                                }else{
+                                                    data.ebook[page_no - 1].images.push_back(ImageOfPage::from(Vector::from(result), width, height));
+                                                } else {
                                                     data.ebook[page_no].images.push_back(ImageOfPage::from(Vector::from(result), width, height));
                                                 }
                                                 let resapp = text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].find("<img");
@@ -366,22 +375,21 @@ impl AppDelegate<AppState> for Delegate {
                                         }
                                     }
 
-                                    if !page_not_ended{
+                                    if !page_not_ended {
                                         data.ebook[page_no].text.push_str(text.as_str());
                                         data.ebook.push_back(Page::new());
-                                        page_no+=1;
+                                        page_no += 1;
                                     } else {
                                         data.ebook[page_no - 1].text.push_str(text.as_str());
                                         page_not_ended = false;
                                     }
 
 
-                                    pos_pageno+= res.as_ref().unwrap()[init.unwrap() + pos_pageno ..].find("</span>").unwrap() +7;
+                                    pos_pageno += res.as_ref().unwrap()[init.unwrap() + pos_pageno..].find("</span>").unwrap() + 7;
 
 
                                     for i in 1..page_occ {
-
-                                        let next_page = res.as_ref().unwrap()[init.unwrap() + pos_pageno ..].find("<span class=\"x-ebookmaker-pageno\"");
+                                        let next_page = res.as_ref().unwrap()[init.unwrap() + pos_pageno..].find("<span class=\"x-ebookmaker-pageno\"");
                                         text = res.as_ref().unwrap()[init.unwrap() + pos_pageno..]._substr(0, next_page.unwrap());
                                         img_occ = text.matches("<img").count();
                                         pos = text.find("<img");
@@ -442,11 +450,10 @@ impl AppDelegate<AppState> for Delegate {
 
                                         data.ebook[page_no].text.push_str(text.as_str());
 
-                                        pos_pageno += next_page.unwrap()+34;
-                                        pos_pageno+= res.as_ref().unwrap()[init.unwrap() + pos_pageno ..].find("</span>").unwrap() +7;
+                                        pos_pageno += next_page.unwrap() + 34;
+                                        pos_pageno += res.as_ref().unwrap()[init.unwrap() + pos_pageno..].find("</span>").unwrap() + 7;
                                         data.ebook.push_back(Page::new());
                                         page_no += 1;
-
                                     }
 
                                     page_not_ended = true;
@@ -513,8 +520,6 @@ impl AppDelegate<AppState> for Delegate {
 
                                     data.ebook.push_back(Page::new());
                                     page_no += 1;
-
-
                                 }
 
 
@@ -533,342 +538,342 @@ impl AppDelegate<AppState> for Delegate {
 
 
 
-/*
-                                if page_occ == 1 {
+                                /*
+                                                                if page_occ == 1 {
 
-                                    let mut pos_pageno = res.as_ref().unwrap()[init.unwrap()..].find("<span class=\"x-ebookmaker-pageno\"");
-                                    let text = res.as_ref().unwrap()[init.unwrap()..]._substr(0 , pos_pageno.unwrap());
-                                    let img_occ = text.matches("<img").count();
-                                    let mut pos = text.find("<img");
-                                    if img_occ > 0 {
-                                        if pos.is_some() {
-                                            let mut displacement: usize = 0;
-                                            for i in 0..img_occ {
-                                                let mut s1 = String::from("OEBPS/");
-                                                let mut app = text[pos.unwrap() + 3 + displacement..].find("src=");
-                                                for c in text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].chars() {
-                                                    if c == '"' {
-                                                        break;
-                                                    } else {
-                                                        s1.push(c);
-                                                    }
-                                                }
-                                                let (width, height) = match blob_size(archive.get_entry(s1.clone()).unwrap().as_slice()) {
-                                                    Ok(dim) => { (dim.width, dim.height) }
-                                                    Err(why) => {
-                                                        println!("Error getting dimensions: {:?}", why);
-                                                        (0, 0)
-                                                    }
-                                                };
+                                                                    let mut pos_pageno = res.as_ref().unwrap()[init.unwrap()..].find("<span class=\"x-ebookmaker-pageno\"");
+                                                                    let text = res.as_ref().unwrap()[init.unwrap()..]._substr(0 , pos_pageno.unwrap());
+                                                                    let img_occ = text.matches("<img").count();
+                                                                    let mut pos = text.find("<img");
+                                                                    if img_occ > 0 {
+                                                                        if pos.is_some() {
+                                                                            let mut displacement: usize = 0;
+                                                                            for i in 0..img_occ {
+                                                                                let mut s1 = String::from("OEBPS/");
+                                                                                let mut app = text[pos.unwrap() + 3 + displacement..].find("src=");
+                                                                                for c in text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].chars() {
+                                                                                    if c == '"' {
+                                                                                        break;
+                                                                                    } else {
+                                                                                        s1.push(c);
+                                                                                    }
+                                                                                }
+                                                                                let (width, height) = match blob_size(archive.get_entry(s1.clone()).unwrap().as_slice()) {
+                                                                                    Ok(dim) => { (dim.width, dim.height) }
+                                                                                    Err(why) => {
+                                                                                        println!("Error getting dimensions: {:?}", why);
+                                                                                        (0, 0)
+                                                                                    }
+                                                                                };
 
-                                                let mut r;
+                                                                                let mut r;
 
-                                                if s1.to_lowercase().contains("jpg") || s1.to_lowercase().contains("jpeg") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Jpeg).unwrap();
-                                                } else if s1.to_lowercase().contains("png") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Png).unwrap();
-                                                } else if s1.to_lowercase().contains("gif") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Gif).unwrap();
-                                                } else if s1.to_lowercase().contains("webp") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::WebP).unwrap();
-                                                } else if s1.to_lowercase().contains("pnm") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Pnm).unwrap();
-                                                } else if s1.to_lowercase().contains("tiff") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tiff).unwrap();
-                                                } else if s1.to_lowercase().contains("tga") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tga).unwrap();
-                                                } else if s1.to_lowercase().contains("bmp") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Bmp).unwrap();
-                                                } else if s1.to_lowercase().contains("ico") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Ico).unwrap();
-                                                } else if s1.to_lowercase().contains("hdr") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Hdr).unwrap();
-                                                } else {
-                                                    panic!("Formato non supportato");
-                                                }
-                                                let result = r.into_bytes();
-                                                data.ebook[page_no-1].images.push_back(ImageOfPage::from(Vector::from(result), width, height));
-                                                let resapp = text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].find("<img");
-                                                displacement = pos.unwrap() + 3 + app.unwrap() + 5 + displacement;
-                                                pos = resapp;
-                                            }
-                                        }
-                                    }
+                                                                                if s1.to_lowercase().contains("jpg") || s1.to_lowercase().contains("jpeg") {
+                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Jpeg).unwrap();
+                                                                                } else if s1.to_lowercase().contains("png") {
+                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Png).unwrap();
+                                                                                } else if s1.to_lowercase().contains("gif") {
+                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Gif).unwrap();
+                                                                                } else if s1.to_lowercase().contains("webp") {
+                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::WebP).unwrap();
+                                                                                } else if s1.to_lowercase().contains("pnm") {
+                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Pnm).unwrap();
+                                                                                } else if s1.to_lowercase().contains("tiff") {
+                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tiff).unwrap();
+                                                                                } else if s1.to_lowercase().contains("tga") {
+                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tga).unwrap();
+                                                                                } else if s1.to_lowercase().contains("bmp") {
+                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Bmp).unwrap();
+                                                                                } else if s1.to_lowercase().contains("ico") {
+                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Ico).unwrap();
+                                                                                } else if s1.to_lowercase().contains("hdr") {
+                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Hdr).unwrap();
+                                                                                } else {
+                                                                                    panic!("Formato non supportato");
+                                                                                }
+                                                                                let result = r.into_bytes();
+                                                                                data.ebook[page_no-1].images.push_back(ImageOfPage::from(Vector::from(result), width, height));
+                                                                                let resapp = text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].find("<img");
+                                                                                displacement = pos.unwrap() + 3 + app.unwrap() + 5 + displacement;
+                                                                                pos = resapp;
+                                                                            }
+                                                                        }
+                                                                    }
 
-                                    data.ebook[page_no].text.push_str(text.as_str());
-                                    data.ebook.push_back(Page::new());
-                                    page_no+=1;
+                                                                    data.ebook[page_no].text.push_str(text.as_str());
+                                                                    data.ebook.push_back(Page::new());
+                                                                    page_no+=1;
 
-                                    let text = res.as_ref().unwrap()[init.unwrap()..]._substr(pos_pageno.unwrap(), res.as_ref().unwrap().len());
-                                    let img_occ = text.matches("<img").count();
-                                    let mut pos = text.find("<img");
-                                    if img_occ > 0 {
-                                        if pos.is_some() {
-                                            let mut displacement: usize = 0;
-                                            for i in 0..img_occ {
-                                                let mut s1 = String::from("OEBPS/");
-                                                let mut app = text[pos.unwrap() + 3 + displacement..].find("src=");
-                                                for c in text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].chars() {
-                                                    if c == '"' {
-                                                        break;
-                                                    } else {
-                                                        s1.push(c);
-                                                    }
-                                                }
-                                                let (width, height) = match blob_size(archive.get_entry(s1.clone()).unwrap().as_slice()) {
-                                                    Ok(dim) => { (dim.width, dim.height) }
-                                                    Err(why) => {
-                                                        println!("Error getting dimensions: {:?}", why);
-                                                        (0, 0)
-                                                    }
-                                                };
+                                                                    let text = res.as_ref().unwrap()[init.unwrap()..]._substr(pos_pageno.unwrap(), res.as_ref().unwrap().len());
+                                                                    let img_occ = text.matches("<img").count();
+                                                                    let mut pos = text.find("<img");
+                                                                    if img_occ > 0 {
+                                                                        if pos.is_some() {
+                                                                            let mut displacement: usize = 0;
+                                                                            for i in 0..img_occ {
+                                                                                let mut s1 = String::from("OEBPS/");
+                                                                                let mut app = text[pos.unwrap() + 3 + displacement..].find("src=");
+                                                                                for c in text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].chars() {
+                                                                                    if c == '"' {
+                                                                                        break;
+                                                                                    } else {
+                                                                                        s1.push(c);
+                                                                                    }
+                                                                                }
+                                                                                let (width, height) = match blob_size(archive.get_entry(s1.clone()).unwrap().as_slice()) {
+                                                                                    Ok(dim) => { (dim.width, dim.height) }
+                                                                                    Err(why) => {
+                                                                                        println!("Error getting dimensions: {:?}", why);
+                                                                                        (0, 0)
+                                                                                    }
+                                                                                };
 
-                                                let mut r;
+                                                                                let mut r;
 
-                                                if s1.to_lowercase().contains("jpg") || s1.to_lowercase().contains("jpeg") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Jpeg).unwrap();
-                                                } else if s1.to_lowercase().contains("png") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Png).unwrap();
-                                                } else if s1.to_lowercase().contains("gif") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Gif).unwrap();
-                                                } else if s1.to_lowercase().contains("webp") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::WebP).unwrap();
-                                                } else if s1.to_lowercase().contains("pnm") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Pnm).unwrap();
-                                                } else if s1.to_lowercase().contains("tiff") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tiff).unwrap();
-                                                } else if s1.to_lowercase().contains("tga") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tga).unwrap();
-                                                } else if s1.to_lowercase().contains("bmp") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Bmp).unwrap();
-                                                } else if s1.to_lowercase().contains("ico") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Ico).unwrap();
-                                                } else if s1.to_lowercase().contains("hdr") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Hdr).unwrap();
-                                                } else {
-                                                    panic!("Formato non supportato");
-                                                }
-                                                let result = r.into_bytes();
-                                                data.ebook[page_no].images.push_back(ImageOfPage::from(Vector::from(result), width, height));
-                                                let resapp = text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].find("<img");
-                                                displacement = pos.unwrap() + 3 + app.unwrap() + 5 + displacement;
-                                                pos = resapp;
-                                            }
-                                        }
-                                    }
+                                                                                if s1.to_lowercase().contains("jpg") || s1.to_lowercase().contains("jpeg") {
+                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Jpeg).unwrap();
+                                                                                } else if s1.to_lowercase().contains("png") {
+                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Png).unwrap();
+                                                                                } else if s1.to_lowercase().contains("gif") {
+                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Gif).unwrap();
+                                                                                } else if s1.to_lowercase().contains("webp") {
+                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::WebP).unwrap();
+                                                                                } else if s1.to_lowercase().contains("pnm") {
+                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Pnm).unwrap();
+                                                                                } else if s1.to_lowercase().contains("tiff") {
+                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tiff).unwrap();
+                                                                                } else if s1.to_lowercase().contains("tga") {
+                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tga).unwrap();
+                                                                                } else if s1.to_lowercase().contains("bmp") {
+                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Bmp).unwrap();
+                                                                                } else if s1.to_lowercase().contains("ico") {
+                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Ico).unwrap();
+                                                                                } else if s1.to_lowercase().contains("hdr") {
+                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Hdr).unwrap();
+                                                                                } else {
+                                                                                    panic!("Formato non supportato");
+                                                                                }
+                                                                                let result = r.into_bytes();
+                                                                                data.ebook[page_no].images.push_back(ImageOfPage::from(Vector::from(result), width, height));
+                                                                                let resapp = text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].find("<img");
+                                                                                displacement = pos.unwrap() + 3 + app.unwrap() + 5 + displacement;
+                                                                                pos = resapp;
+                                                                            }
+                                                                        }
+                                                                    }
 
-                                    data.ebook[page_no].text.push_str(text.as_str());
-                                    page_no += 1;
-                                    page_not_ended = true;
-                                }
-
-
-                                else if page_occ > 1 {
-                                    //controllo per vedere se il file html aperto è suddiviso in più pagine
-                                    let mut pos_pageno = res.as_ref().unwrap()[init.unwrap()..].find("<span class=\"x-ebookmaker-pageno\"");
-
-                                    for i in 0..page_occ {
-
-                                        if page_not_ended {
-
-                                            let text = res.as_ref().unwrap()[init.unwrap()..]._substr(0 , pos_pageno.unwrap());
-                                            let img_occ = text.matches("<img").count();
-                                            let mut pos = text.find("<img");
-                                            if img_occ > 0 {
-                                                if pos.is_some() {
-                                                    let mut displacement: usize = 0;
-                                                    for i in 0..img_occ {
-                                                        let mut s1 = String::from("OEBPS/");
-                                                        let mut app = text[pos.unwrap() + 3 + displacement..].find("src=");
-                                                        for c in text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].chars() {
-                                                            if c == '"' {
-                                                                break;
-                                                            } else {
-                                                                s1.push(c);
-                                                            }
-                                                        }
-                                                        let (width, height) = match blob_size(archive.get_entry(s1.clone()).unwrap().as_slice()) {
-                                                            Ok(dim) => { (dim.width, dim.height) }
-                                                            Err(why) => {
-                                                                println!("Error getting dimensions: {:?}", why);
-                                                                (0, 0)
-                                                            }
-                                                        };
-
-                                                        let mut r;
-
-                                                        if s1.to_lowercase().contains("jpg") || s1.to_lowercase().contains("jpeg") {
-                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Jpeg).unwrap();
-                                                        } else if s1.to_lowercase().contains("png") {
-                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Png).unwrap();
-                                                        } else if s1.to_lowercase().contains("gif") {
-                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Gif).unwrap();
-                                                        } else if s1.to_lowercase().contains("webp") {
-                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::WebP).unwrap();
-                                                        } else if s1.to_lowercase().contains("pnm") {
-                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Pnm).unwrap();
-                                                        } else if s1.to_lowercase().contains("tiff") {
-                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tiff).unwrap();
-                                                        } else if s1.to_lowercase().contains("tga") {
-                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tga).unwrap();
-                                                        } else if s1.to_lowercase().contains("bmp") {
-                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Bmp).unwrap();
-                                                        } else if s1.to_lowercase().contains("ico") {
-                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Ico).unwrap();
-                                                        } else if s1.to_lowercase().contains("hdr") {
-                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Hdr).unwrap();
-                                                        } else {
-                                                            panic!("Formato non supportato");
-                                                        }
-                                                        let result = r.into_bytes();
-                                                        data.ebook[page_no-1].images.push_back(ImageOfPage::from(Vector::from(result), width, height));
-                                                        let resapp = text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].find("<img");
-                                                        displacement = pos.unwrap() + 3 + app.unwrap() + 5 + displacement;
-                                                        pos = resapp;
-                                                    }
-                                                }
-                                            }
-
-                                            data.ebook[page_no-1].text.push_str(text.as_str());
-                                            page_not_ended = false;
-                                        }
-
-                                        if i == page_occ - 1 {
-
-                                            page_not_ended = true;
-                                            let text = res.as_ref().unwrap()[init.unwrap()..]._substr(pos_pageno.unwrap(), res.as_ref().unwrap().len());
-                                            let img_occ = text.matches("<img").count();
-                                            let mut pos = text.find("<img");
-                                            if img_occ > 0 {
-                                                if pos.is_some() {
-                                                    let mut displacement: usize = 0;
-                                                    for i in 0..img_occ {
-                                                        let mut s1 = String::from("OEBPS/");
-                                                        let mut app = text[pos.unwrap() + 3 + displacement..].find("src=");
-                                                        for c in text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].chars() {
-                                                            if c == '"' {
-                                                                break;
-                                                            } else {
-                                                                s1.push(c);
-                                                            }
-                                                        }
-                                                        let (width, height) = match blob_size(archive.get_entry(s1.clone()).unwrap().as_slice()) {
-                                                            Ok(dim) => { (dim.width, dim.height) }
-                                                            Err(why) => {
-                                                                println!("Error getting dimensions: {:?}", why);
-                                                                (0, 0)
-                                                            }
-                                                        };
-
-                                                        let mut r;
-
-                                                        if s1.to_lowercase().contains("jpg") || s1.to_lowercase().contains("jpeg") {
-                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Jpeg).unwrap();
-                                                        } else if s1.to_lowercase().contains("png") {
-                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Png).unwrap();
-                                                        } else if s1.to_lowercase().contains("gif") {
-                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Gif).unwrap();
-                                                        } else if s1.to_lowercase().contains("webp") {
-                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::WebP).unwrap();
-                                                        } else if s1.to_lowercase().contains("pnm") {
-                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Pnm).unwrap();
-                                                        } else if s1.to_lowercase().contains("tiff") {
-                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tiff).unwrap();
-                                                        } else if s1.to_lowercase().contains("tga") {
-                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tga).unwrap();
-                                                        } else if s1.to_lowercase().contains("bmp") {
-                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Bmp).unwrap();
-                                                        } else if s1.to_lowercase().contains("ico") {
-                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Ico).unwrap();
-                                                        } else if s1.to_lowercase().contains("hdr") {
-                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Hdr).unwrap();
-                                                        } else {
-                                                            panic!("Formato non supportato");
-                                                        }
-                                                        let result = r.into_bytes();
-                                                        data.ebook[page_no].images.push_back(ImageOfPage::from(Vector::from(result), width, height));
-                                                        let resapp = text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].find("<img");
-                                                        displacement = pos.unwrap() + 3 + app.unwrap() + 5 + displacement;
-                                                        pos = resapp;
-                                                    }
-                                                }
-                                            }
-
-                                            data.ebook[page_no].text.push_str(text.as_str());
-                                            page_no += 1;
-
-                                        } else {
-
-                                            let next_page = res.as_ref().unwrap()[pos_pageno.unwrap() + 34 ..].find("<span class=\"x-ebookmaker-pageno\"");
-                                            let text = res.as_ref().unwrap()[init.unwrap()..]._substr(pos_pageno.unwrap(), next_page.unwrap());
-                                            let img_occ = text.matches("<img").count();
-                                            let mut pos = text.find("<img");
-                                            if img_occ > 0 {
-                                                if pos.is_some() {
-                                                    let mut displacement: usize = 0;
-                                                    for i in 0..img_occ {
-                                                        let mut s1 = String::from("OEBPS/");
-                                                        let mut app = text[pos.unwrap() + 3 + displacement..].find("src=");
-                                                        for c in text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].chars() {
-                                                            if c == '"' {
-                                                                break;
-                                                            } else {
-                                                                s1.push(c);
-                                                            }
-                                                        }
-                                                        let (width, height) = match blob_size(archive.get_entry(s1.clone()).unwrap().as_slice()) {
-                                                            Ok(dim) => { (dim.width, dim.height) }
-                                                            Err(why) => {
-                                                                println!("Error getting dimensions: {:?}", why);
-                                                                (0, 0)
-                                                            }
-                                                        };
-
-                                                        let mut r;
-
-                                                        if s1.to_lowercase().contains("jpg") || s1.to_lowercase().contains("jpeg") {
-                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Jpeg).unwrap();
-                                                        } else if s1.to_lowercase().contains("png") {
-                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Png).unwrap();
-                                                        } else if s1.to_lowercase().contains("gif") {
-                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Gif).unwrap();
-                                                        } else if s1.to_lowercase().contains("webp") {
-                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::WebP).unwrap();
-                                                        } else if s1.to_lowercase().contains("pnm") {
-                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Pnm).unwrap();
-                                                        } else if s1.to_lowercase().contains("tiff") {
-                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tiff).unwrap();
-                                                        } else if s1.to_lowercase().contains("tga") {
-                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tga).unwrap();
-                                                        } else if s1.to_lowercase().contains("bmp") {
-                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Bmp).unwrap();
-                                                        } else if s1.to_lowercase().contains("ico") {
-                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Ico).unwrap();
-                                                        } else if s1.to_lowercase().contains("hdr") {
-                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Hdr).unwrap();
-                                                        } else {
-                                                            panic!("Formato non supportato");
-                                                        }
-                                                        let result = r.into_bytes();
-                                                        data.ebook[page_no].images.push_back(ImageOfPage::from(Vector::from(result), width, height));
-                                                        let resapp = text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].find("<img");
-                                                        displacement = pos.unwrap() + 3 + app.unwrap() + 5 + displacement;
-                                                        pos = resapp;
-                                                    }
-                                                }
-                                            }
-
-                                            data.ebook[page_no].text.push_str(text.as_str());
-                                            pos_pageno = next_page;
-
-                                            data.ebook.push_back(Page::new());
-                                            page_no += 1;
-                                        }
+                                                                    data.ebook[page_no].text.push_str(text.as_str());
+                                                                    page_no += 1;
+                                                                    page_not_ended = true;
+                                                                }
 
 
-                                    }
-                                }
-*/
+                                                                else if page_occ > 1 {
+                                                                    //controllo per vedere se il file html aperto è suddiviso in più pagine
+                                                                    let mut pos_pageno = res.as_ref().unwrap()[init.unwrap()..].find("<span class=\"x-ebookmaker-pageno\"");
+
+                                                                    for i in 0..page_occ {
+
+                                                                        if page_not_ended {
+
+                                                                            let text = res.as_ref().unwrap()[init.unwrap()..]._substr(0 , pos_pageno.unwrap());
+                                                                            let img_occ = text.matches("<img").count();
+                                                                            let mut pos = text.find("<img");
+                                                                            if img_occ > 0 {
+                                                                                if pos.is_some() {
+                                                                                    let mut displacement: usize = 0;
+                                                                                    for i in 0..img_occ {
+                                                                                        let mut s1 = String::from("OEBPS/");
+                                                                                        let mut app = text[pos.unwrap() + 3 + displacement..].find("src=");
+                                                                                        for c in text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].chars() {
+                                                                                            if c == '"' {
+                                                                                                break;
+                                                                                            } else {
+                                                                                                s1.push(c);
+                                                                                            }
+                                                                                        }
+                                                                                        let (width, height) = match blob_size(archive.get_entry(s1.clone()).unwrap().as_slice()) {
+                                                                                            Ok(dim) => { (dim.width, dim.height) }
+                                                                                            Err(why) => {
+                                                                                                println!("Error getting dimensions: {:?}", why);
+                                                                                                (0, 0)
+                                                                                            }
+                                                                                        };
+
+                                                                                        let mut r;
+
+                                                                                        if s1.to_lowercase().contains("jpg") || s1.to_lowercase().contains("jpeg") {
+                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Jpeg).unwrap();
+                                                                                        } else if s1.to_lowercase().contains("png") {
+                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Png).unwrap();
+                                                                                        } else if s1.to_lowercase().contains("gif") {
+                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Gif).unwrap();
+                                                                                        } else if s1.to_lowercase().contains("webp") {
+                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::WebP).unwrap();
+                                                                                        } else if s1.to_lowercase().contains("pnm") {
+                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Pnm).unwrap();
+                                                                                        } else if s1.to_lowercase().contains("tiff") {
+                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tiff).unwrap();
+                                                                                        } else if s1.to_lowercase().contains("tga") {
+                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tga).unwrap();
+                                                                                        } else if s1.to_lowercase().contains("bmp") {
+                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Bmp).unwrap();
+                                                                                        } else if s1.to_lowercase().contains("ico") {
+                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Ico).unwrap();
+                                                                                        } else if s1.to_lowercase().contains("hdr") {
+                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Hdr).unwrap();
+                                                                                        } else {
+                                                                                            panic!("Formato non supportato");
+                                                                                        }
+                                                                                        let result = r.into_bytes();
+                                                                                        data.ebook[page_no-1].images.push_back(ImageOfPage::from(Vector::from(result), width, height));
+                                                                                        let resapp = text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].find("<img");
+                                                                                        displacement = pos.unwrap() + 3 + app.unwrap() + 5 + displacement;
+                                                                                        pos = resapp;
+                                                                                    }
+                                                                                }
+                                                                            }
+
+                                                                            data.ebook[page_no-1].text.push_str(text.as_str());
+                                                                            page_not_ended = false;
+                                                                        }
+
+                                                                        if i == page_occ - 1 {
+
+                                                                            page_not_ended = true;
+                                                                            let text = res.as_ref().unwrap()[init.unwrap()..]._substr(pos_pageno.unwrap(), res.as_ref().unwrap().len());
+                                                                            let img_occ = text.matches("<img").count();
+                                                                            let mut pos = text.find("<img");
+                                                                            if img_occ > 0 {
+                                                                                if pos.is_some() {
+                                                                                    let mut displacement: usize = 0;
+                                                                                    for i in 0..img_occ {
+                                                                                        let mut s1 = String::from("OEBPS/");
+                                                                                        let mut app = text[pos.unwrap() + 3 + displacement..].find("src=");
+                                                                                        for c in text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].chars() {
+                                                                                            if c == '"' {
+                                                                                                break;
+                                                                                            } else {
+                                                                                                s1.push(c);
+                                                                                            }
+                                                                                        }
+                                                                                        let (width, height) = match blob_size(archive.get_entry(s1.clone()).unwrap().as_slice()) {
+                                                                                            Ok(dim) => { (dim.width, dim.height) }
+                                                                                            Err(why) => {
+                                                                                                println!("Error getting dimensions: {:?}", why);
+                                                                                                (0, 0)
+                                                                                            }
+                                                                                        };
+
+                                                                                        let mut r;
+
+                                                                                        if s1.to_lowercase().contains("jpg") || s1.to_lowercase().contains("jpeg") {
+                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Jpeg).unwrap();
+                                                                                        } else if s1.to_lowercase().contains("png") {
+                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Png).unwrap();
+                                                                                        } else if s1.to_lowercase().contains("gif") {
+                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Gif).unwrap();
+                                                                                        } else if s1.to_lowercase().contains("webp") {
+                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::WebP).unwrap();
+                                                                                        } else if s1.to_lowercase().contains("pnm") {
+                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Pnm).unwrap();
+                                                                                        } else if s1.to_lowercase().contains("tiff") {
+                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tiff).unwrap();
+                                                                                        } else if s1.to_lowercase().contains("tga") {
+                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tga).unwrap();
+                                                                                        } else if s1.to_lowercase().contains("bmp") {
+                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Bmp).unwrap();
+                                                                                        } else if s1.to_lowercase().contains("ico") {
+                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Ico).unwrap();
+                                                                                        } else if s1.to_lowercase().contains("hdr") {
+                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Hdr).unwrap();
+                                                                                        } else {
+                                                                                            panic!("Formato non supportato");
+                                                                                        }
+                                                                                        let result = r.into_bytes();
+                                                                                        data.ebook[page_no].images.push_back(ImageOfPage::from(Vector::from(result), width, height));
+                                                                                        let resapp = text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].find("<img");
+                                                                                        displacement = pos.unwrap() + 3 + app.unwrap() + 5 + displacement;
+                                                                                        pos = resapp;
+                                                                                    }
+                                                                                }
+                                                                            }
+
+                                                                            data.ebook[page_no].text.push_str(text.as_str());
+                                                                            page_no += 1;
+
+                                                                        } else {
+
+                                                                            let next_page = res.as_ref().unwrap()[pos_pageno.unwrap() + 34 ..].find("<span class=\"x-ebookmaker-pageno\"");
+                                                                            let text = res.as_ref().unwrap()[init.unwrap()..]._substr(pos_pageno.unwrap(), next_page.unwrap());
+                                                                            let img_occ = text.matches("<img").count();
+                                                                            let mut pos = text.find("<img");
+                                                                            if img_occ > 0 {
+                                                                                if pos.is_some() {
+                                                                                    let mut displacement: usize = 0;
+                                                                                    for i in 0..img_occ {
+                                                                                        let mut s1 = String::from("OEBPS/");
+                                                                                        let mut app = text[pos.unwrap() + 3 + displacement..].find("src=");
+                                                                                        for c in text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].chars() {
+                                                                                            if c == '"' {
+                                                                                                break;
+                                                                                            } else {
+                                                                                                s1.push(c);
+                                                                                            }
+                                                                                        }
+                                                                                        let (width, height) = match blob_size(archive.get_entry(s1.clone()).unwrap().as_slice()) {
+                                                                                            Ok(dim) => { (dim.width, dim.height) }
+                                                                                            Err(why) => {
+                                                                                                println!("Error getting dimensions: {:?}", why);
+                                                                                                (0, 0)
+                                                                                            }
+                                                                                        };
+
+                                                                                        let mut r;
+
+                                                                                        if s1.to_lowercase().contains("jpg") || s1.to_lowercase().contains("jpeg") {
+                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Jpeg).unwrap();
+                                                                                        } else if s1.to_lowercase().contains("png") {
+                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Png).unwrap();
+                                                                                        } else if s1.to_lowercase().contains("gif") {
+                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Gif).unwrap();
+                                                                                        } else if s1.to_lowercase().contains("webp") {
+                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::WebP).unwrap();
+                                                                                        } else if s1.to_lowercase().contains("pnm") {
+                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Pnm).unwrap();
+                                                                                        } else if s1.to_lowercase().contains("tiff") {
+                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tiff).unwrap();
+                                                                                        } else if s1.to_lowercase().contains("tga") {
+                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tga).unwrap();
+                                                                                        } else if s1.to_lowercase().contains("bmp") {
+                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Bmp).unwrap();
+                                                                                        } else if s1.to_lowercase().contains("ico") {
+                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Ico).unwrap();
+                                                                                        } else if s1.to_lowercase().contains("hdr") {
+                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Hdr).unwrap();
+                                                                                        } else {
+                                                                                            panic!("Formato non supportato");
+                                                                                        }
+                                                                                        let result = r.into_bytes();
+                                                                                        data.ebook[page_no].images.push_back(ImageOfPage::from(Vector::from(result), width, height));
+                                                                                        let resapp = text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].find("<img");
+                                                                                        displacement = pos.unwrap() + 3 + app.unwrap() + 5 + displacement;
+                                                                                        pos = resapp;
+                                                                                    }
+                                                                                }
+                                                                            }
+
+                                                                            data.ebook[page_no].text.push_str(text.as_str());
+                                                                            pos_pageno = next_page;
+
+                                                                            data.ebook.push_back(Page::new());
+                                                                            page_no += 1;
+                                                                        }
+
+
+                                                                    }
+                                                                }
+                                */
                                 //TODO: revisionare una volta fatto il salvataggio (per la questione relativa al segnalibro:
                                 // quando chiudo l'app, la prossima riapertura mi riporta all'ultima pagina letta (?))
                                 // let res = archive.get_entry_as_str(f);
@@ -939,7 +944,6 @@ impl AppDelegate<AppState> for Delegate {
                                     page_no += 1;
                                 }
                             }
-
                         }
                     }
                 }

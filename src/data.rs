@@ -1,8 +1,9 @@
-use druid::{Data, Lens, EventCtx, Env, ArcStr, KeyOrValue, FontFamily, commands, AppDelegate, DelegateCtx, Target, Command, Handled, ImageBuf, Widget, WidgetExt, Event, LifeCycleCtx, LifeCycle, UpdateCtx, LayoutCtx, BoxConstraints, Size, PaintCtx, WidgetId, WindowHandle};
+use std::error::Error;
+use druid::{Data, Lens, EventCtx, Env, ArcStr, KeyOrValue, FontFamily, commands, AppDelegate, DelegateCtx, Target, Command, Handled, ImageBuf, Widget, WidgetExt, Event, LifeCycleCtx, LifeCycle, UpdateCtx, LayoutCtx, BoxConstraints, Size, PaintCtx, WidgetId, WindowHandle, LensExt, Selector};
 use druid::text::{RichText, Attribute};
 use epub::doc::EpubDoc;
 use std::fs::File;
-use std::io::{Read, Write};
+use std::io::{BufReader, Read, Write};
 use std::path::Path;
 use std::str::from_utf8;
 use druid::Event::WindowSize;
@@ -15,11 +16,14 @@ use image::imageops::resize;
 use native_dialog::{MessageDialog, MessageType};
 use voca_rs::Voca;
 use crate::view::build_widget;
+use serde::Serialize;
+use serde::Deserialize;
+use serde_json::json;
 
 const SIZE_FONT: f64 = 40.0;
 
 //TODO: implemenatare una struttura che gestisca i capitolo secondo formattazione html v[0]="<p>Test<p>" v[1]="<img>....<img>"
-#[derive(Clone, Data, Lens)]
+#[derive(Clone, Data, Lens, Serialize, Deserialize)]
 pub struct ImageOfPage {
     pub image: Vector<u8>,
     pub width: usize,
@@ -63,6 +67,7 @@ impl Rebuilder {
 
 impl Widget<AppState> for Rebuilder {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut AppState, env: &Env) {
+
         if (data.window_size != self.window_size) {
             data.window_size = self.window_size;
         }
@@ -103,7 +108,7 @@ impl Widget<AppState> for Rebuilder {
     }
 }
 
-#[derive(Clone, Data, Lens)]
+#[derive(Clone, Data, Lens, Serialize, Deserialize)]
 pub struct Page {
     pub text: String,
     pub images: Vector<ImageOfPage>,
@@ -125,13 +130,48 @@ impl Page {
     }
 }
 
-#[derive(Clone, Data, Lens)]
+#[derive(Clone, Data, Serialize, Deserialize)]
+pub struct Chapter {
+    pub title: String,
+    pub target_page: usize,
+}
+
+impl Chapter {
+    pub fn new() -> Self {
+        Self {
+            title: String::new(),
+            target_page: 0,
+        }
+    }
+}
+
+#[derive(Clone, Data, Serialize, Deserialize)]
+pub struct Json_struct {
+    pub bookmarks: Vector<(String, usize)>,
+    pub last_page: usize,
+}
+
+impl Json_struct {
+    pub fn new() -> Self {
+        Self {
+            bookmarks: Vector::new(),
+            last_page: 0,
+        }
+    }
+}
+
+
+
+#[derive(Clone, Data, Lens, Serialize, Deserialize)]
 pub struct AppState {
     pub font_size: String,
     pub ebook: Vector<Page>,
     pub current_page: usize,
     pub window_size: f64,
     pub double_page: bool,
+    pub title: String,
+    pub chapters: Vector<Chapter>,
+    pub saves: Json_struct,
 }
 
 impl AppState {
@@ -142,6 +182,9 @@ impl AppState {
             current_page: 0,
             window_size: 1100.,
             double_page: false,
+            title: String::new(),
+            chapters: Vector::<Chapter>::new(),
+            saves: Json_struct::new(),
         }
     }
 
@@ -151,11 +194,6 @@ impl AppState {
     fn plus(&mut self) {
         let new_size = self.font_size.parse::<f64>().unwrap() + 1.;
         self.font_size = new_size.to_string();
-        /*if self.ebook.is_empty(){
-            self.rich_text = RichText::new(ArcStr::from(new_size.to_string().as_str())).with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(new_size)));
-        }else{
-            self.rich_text = RichText::new(ArcStr::from(self.ebook.clone())).with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(new_size)));
-        }*/
     }
     pub fn click_min_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         data.min();
@@ -163,11 +201,6 @@ impl AppState {
     fn min(&mut self) {
         let new_size = self.font_size.parse::<f64>().unwrap() - 1.;
         self.font_size = new_size.to_string();
-        /*if self.ebook.is_empty(){
-            self.rich_text = RichText::new(ArcStr::from(new_size.to_string().as_str())).with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(new_size)));
-        }else{
-            self.rich_text = RichText::new(ArcStr::from(self.ebook.clone())).with_attribute(.., Attribute::FontSize(KeyOrValue::Concrete(new_size)));
-        }*/
     }
     pub fn click_edit_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         if data.ebook.len() == 0 {
@@ -180,6 +213,7 @@ impl AppState {
             //TODO: Fare la vera funzione
 
             println!("Ebook non vuoto");
+            data.load_from_json();
         }
     }
 
@@ -191,9 +225,10 @@ impl AppState {
                 .set_title("Ebook not selected")
                 .show_alert();
         } else {
-            //TODO: Fare la vera funzione
 
-            println!("Ebook non vuoto");
+            data.saves.last_page = data.current_page;
+            //TODO: aggiornare anche i bookmarks
+            data.save_to_json();
         }
     }
 
@@ -232,15 +267,19 @@ impl AppState {
                 .set_title("Ebook not selected")
                 .show_alert();
         } else {
-            //TODO: Fare la vera funzione
-
-            if data.double_page{
+            if data.double_page {
                 if data.current_page > 1 {
                     data.current_page -= 2;
+                    data.saves.last_page = data.current_page;
+                    //TODO: aggiornare anche i bookmarks
+                    data.save_to_json();
                 }
-            }else{
+            } else {
                 if data.current_page > 0 {
                     data.current_page -= 1;
+                    data.saves.last_page = data.current_page;
+                    //TODO: aggiornare anche i bookmarks
+                    data.save_to_json();
                 }
             }
         }
@@ -254,17 +293,57 @@ impl AppState {
                 .set_title("Ebook not selected")
                 .show_alert();
         } else {
-            //TODO: Fare la vera funzione
-
-            if data.double_page{
+            if data.double_page {
                 if data.current_page < (data.ebook.len() - 2) {
                     data.current_page += 2;
+                    data.saves.last_page = data.current_page;
+                    //TODO: aggiornare anche i bookmarks
+                    data.save_to_json();
                 }
-            }else{
+            } else {
                 if data.current_page < (data.ebook.len() - 1) {
                     data.current_page += 1;
+                    data.saves.last_page = data.current_page;
+                    //TODO: aggiornare anche i bookmarks
+                    data.save_to_json();
                 }
             }
+        }
+    }
+
+    pub fn save_to_json(&self) {
+
+        let serialized = serde_json::to_string(&self.saves).unwrap();
+
+        let filename = self.title.clone() + ".json";
+        let path = Path::new("\\Ebook_Reader\\Metadata\\");
+
+        std::fs::create_dir_all(path).unwrap();
+
+        let mut p = String::from(path.to_str().unwrap());
+        p.push_str(filename.as_str());
+        std::fs::write(p, serialized).unwrap();
+        println!("Ho salvato in: {}", filename);
+
+    }
+
+    pub fn load_from_json(&mut self) {
+        let mut path = String::from("\\Ebook_Reader\\Metadata\\");
+        path.push_str(self.title.as_str());
+        path.push_str(".json");
+        let file = File::open(path);
+
+        match file {
+            Ok(file) => {
+                let reader = BufReader::new(file);
+                let mut de = serde_json::Deserializer::from_reader(reader);
+                let u = Json_struct::deserialize(&mut de).unwrap();
+
+                self.saves = u;
+                self.current_page = self.saves.last_page;
+
+            }
+            Err(_) => {},
         }
     }
 }
@@ -280,22 +359,28 @@ impl AppDelegate<AppState> for Delegate {
         data: &mut AppState,
         _env: &Env,
     ) -> Handled {
-        //if let Some(file_info) = cmd.get(commands::SAVE_FILE_AS) {
-        //if let Err(e) = std::fs::write(file_info.path(), &data[..]) {
-        //println!("Error writing file: {}", e);
-        //}
-        //return Handled::Yes;
-        //}
-        /*let mut x = 0;
-        let mut v;*/
 
         if let Some(file_info) = cmd.get(commands::OPEN_FILE) {
-            //println!("{}", file_info.path().display());
             match EpubArchive::new(file_info.clone().path())
             {
                 Ok(mut archive) => {
+
+                    if data.ebook.len() > 0 {
+                        //TODO: aggiornare anche i bookmarks
+                        data.saves.last_page = data.current_page;
+                        data.save_to_json();
+                    }
+
                     data.ebook.clear();
                     data.current_page = 0;
+                    data.title = file_info.clone().path().to_str().unwrap().split("\\")
+                        .last().unwrap().split(".")
+                        .next().unwrap().to_string();
+                    data.saves.last_page = 0;
+                    data.saves.bookmarks.clear();
+
+                    data.load_from_json();
+
                     let mut page_no = 0;
                     let mut page_not_ended = false;
 
@@ -522,358 +607,6 @@ impl AppDelegate<AppState> for Delegate {
                                     page_no += 1;
                                 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                                /*
-                                                                if page_occ == 1 {
-
-                                                                    let mut pos_pageno = res.as_ref().unwrap()[init.unwrap()..].find("<span class=\"x-ebookmaker-pageno\"");
-                                                                    let text = res.as_ref().unwrap()[init.unwrap()..]._substr(0 , pos_pageno.unwrap());
-                                                                    let img_occ = text.matches("<img").count();
-                                                                    let mut pos = text.find("<img");
-                                                                    if img_occ > 0 {
-                                                                        if pos.is_some() {
-                                                                            let mut displacement: usize = 0;
-                                                                            for i in 0..img_occ {
-                                                                                let mut s1 = String::from("OEBPS/");
-                                                                                let mut app = text[pos.unwrap() + 3 + displacement..].find("src=");
-                                                                                for c in text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].chars() {
-                                                                                    if c == '"' {
-                                                                                        break;
-                                                                                    } else {
-                                                                                        s1.push(c);
-                                                                                    }
-                                                                                }
-                                                                                let (width, height) = match blob_size(archive.get_entry(s1.clone()).unwrap().as_slice()) {
-                                                                                    Ok(dim) => { (dim.width, dim.height) }
-                                                                                    Err(why) => {
-                                                                                        println!("Error getting dimensions: {:?}", why);
-                                                                                        (0, 0)
-                                                                                    }
-                                                                                };
-
-                                                                                let mut r;
-
-                                                                                if s1.to_lowercase().contains("jpg") || s1.to_lowercase().contains("jpeg") {
-                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Jpeg).unwrap();
-                                                                                } else if s1.to_lowercase().contains("png") {
-                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Png).unwrap();
-                                                                                } else if s1.to_lowercase().contains("gif") {
-                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Gif).unwrap();
-                                                                                } else if s1.to_lowercase().contains("webp") {
-                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::WebP).unwrap();
-                                                                                } else if s1.to_lowercase().contains("pnm") {
-                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Pnm).unwrap();
-                                                                                } else if s1.to_lowercase().contains("tiff") {
-                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tiff).unwrap();
-                                                                                } else if s1.to_lowercase().contains("tga") {
-                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tga).unwrap();
-                                                                                } else if s1.to_lowercase().contains("bmp") {
-                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Bmp).unwrap();
-                                                                                } else if s1.to_lowercase().contains("ico") {
-                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Ico).unwrap();
-                                                                                } else if s1.to_lowercase().contains("hdr") {
-                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Hdr).unwrap();
-                                                                                } else {
-                                                                                    panic!("Formato non supportato");
-                                                                                }
-                                                                                let result = r.into_bytes();
-                                                                                data.ebook[page_no-1].images.push_back(ImageOfPage::from(Vector::from(result), width, height));
-                                                                                let resapp = text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].find("<img");
-                                                                                displacement = pos.unwrap() + 3 + app.unwrap() + 5 + displacement;
-                                                                                pos = resapp;
-                                                                            }
-                                                                        }
-                                                                    }
-
-                                                                    data.ebook[page_no].text.push_str(text.as_str());
-                                                                    data.ebook.push_back(Page::new());
-                                                                    page_no+=1;
-
-                                                                    let text = res.as_ref().unwrap()[init.unwrap()..]._substr(pos_pageno.unwrap(), res.as_ref().unwrap().len());
-                                                                    let img_occ = text.matches("<img").count();
-                                                                    let mut pos = text.find("<img");
-                                                                    if img_occ > 0 {
-                                                                        if pos.is_some() {
-                                                                            let mut displacement: usize = 0;
-                                                                            for i in 0..img_occ {
-                                                                                let mut s1 = String::from("OEBPS/");
-                                                                                let mut app = text[pos.unwrap() + 3 + displacement..].find("src=");
-                                                                                for c in text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].chars() {
-                                                                                    if c == '"' {
-                                                                                        break;
-                                                                                    } else {
-                                                                                        s1.push(c);
-                                                                                    }
-                                                                                }
-                                                                                let (width, height) = match blob_size(archive.get_entry(s1.clone()).unwrap().as_slice()) {
-                                                                                    Ok(dim) => { (dim.width, dim.height) }
-                                                                                    Err(why) => {
-                                                                                        println!("Error getting dimensions: {:?}", why);
-                                                                                        (0, 0)
-                                                                                    }
-                                                                                };
-
-                                                                                let mut r;
-
-                                                                                if s1.to_lowercase().contains("jpg") || s1.to_lowercase().contains("jpeg") {
-                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Jpeg).unwrap();
-                                                                                } else if s1.to_lowercase().contains("png") {
-                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Png).unwrap();
-                                                                                } else if s1.to_lowercase().contains("gif") {
-                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Gif).unwrap();
-                                                                                } else if s1.to_lowercase().contains("webp") {
-                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::WebP).unwrap();
-                                                                                } else if s1.to_lowercase().contains("pnm") {
-                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Pnm).unwrap();
-                                                                                } else if s1.to_lowercase().contains("tiff") {
-                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tiff).unwrap();
-                                                                                } else if s1.to_lowercase().contains("tga") {
-                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tga).unwrap();
-                                                                                } else if s1.to_lowercase().contains("bmp") {
-                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Bmp).unwrap();
-                                                                                } else if s1.to_lowercase().contains("ico") {
-                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Ico).unwrap();
-                                                                                } else if s1.to_lowercase().contains("hdr") {
-                                                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Hdr).unwrap();
-                                                                                } else {
-                                                                                    panic!("Formato non supportato");
-                                                                                }
-                                                                                let result = r.into_bytes();
-                                                                                data.ebook[page_no].images.push_back(ImageOfPage::from(Vector::from(result), width, height));
-                                                                                let resapp = text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].find("<img");
-                                                                                displacement = pos.unwrap() + 3 + app.unwrap() + 5 + displacement;
-                                                                                pos = resapp;
-                                                                            }
-                                                                        }
-                                                                    }
-
-                                                                    data.ebook[page_no].text.push_str(text.as_str());
-                                                                    page_no += 1;
-                                                                    page_not_ended = true;
-                                                                }
-
-
-                                                                else if page_occ > 1 {
-                                                                    //controllo per vedere se il file html aperto è suddiviso in più pagine
-                                                                    let mut pos_pageno = res.as_ref().unwrap()[init.unwrap()..].find("<span class=\"x-ebookmaker-pageno\"");
-
-                                                                    for i in 0..page_occ {
-
-                                                                        if page_not_ended {
-
-                                                                            let text = res.as_ref().unwrap()[init.unwrap()..]._substr(0 , pos_pageno.unwrap());
-                                                                            let img_occ = text.matches("<img").count();
-                                                                            let mut pos = text.find("<img");
-                                                                            if img_occ > 0 {
-                                                                                if pos.is_some() {
-                                                                                    let mut displacement: usize = 0;
-                                                                                    for i in 0..img_occ {
-                                                                                        let mut s1 = String::from("OEBPS/");
-                                                                                        let mut app = text[pos.unwrap() + 3 + displacement..].find("src=");
-                                                                                        for c in text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].chars() {
-                                                                                            if c == '"' {
-                                                                                                break;
-                                                                                            } else {
-                                                                                                s1.push(c);
-                                                                                            }
-                                                                                        }
-                                                                                        let (width, height) = match blob_size(archive.get_entry(s1.clone()).unwrap().as_slice()) {
-                                                                                            Ok(dim) => { (dim.width, dim.height) }
-                                                                                            Err(why) => {
-                                                                                                println!("Error getting dimensions: {:?}", why);
-                                                                                                (0, 0)
-                                                                                            }
-                                                                                        };
-
-                                                                                        let mut r;
-
-                                                                                        if s1.to_lowercase().contains("jpg") || s1.to_lowercase().contains("jpeg") {
-                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Jpeg).unwrap();
-                                                                                        } else if s1.to_lowercase().contains("png") {
-                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Png).unwrap();
-                                                                                        } else if s1.to_lowercase().contains("gif") {
-                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Gif).unwrap();
-                                                                                        } else if s1.to_lowercase().contains("webp") {
-                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::WebP).unwrap();
-                                                                                        } else if s1.to_lowercase().contains("pnm") {
-                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Pnm).unwrap();
-                                                                                        } else if s1.to_lowercase().contains("tiff") {
-                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tiff).unwrap();
-                                                                                        } else if s1.to_lowercase().contains("tga") {
-                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tga).unwrap();
-                                                                                        } else if s1.to_lowercase().contains("bmp") {
-                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Bmp).unwrap();
-                                                                                        } else if s1.to_lowercase().contains("ico") {
-                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Ico).unwrap();
-                                                                                        } else if s1.to_lowercase().contains("hdr") {
-                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Hdr).unwrap();
-                                                                                        } else {
-                                                                                            panic!("Formato non supportato");
-                                                                                        }
-                                                                                        let result = r.into_bytes();
-                                                                                        data.ebook[page_no-1].images.push_back(ImageOfPage::from(Vector::from(result), width, height));
-                                                                                        let resapp = text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].find("<img");
-                                                                                        displacement = pos.unwrap() + 3 + app.unwrap() + 5 + displacement;
-                                                                                        pos = resapp;
-                                                                                    }
-                                                                                }
-                                                                            }
-
-                                                                            data.ebook[page_no-1].text.push_str(text.as_str());
-                                                                            page_not_ended = false;
-                                                                        }
-
-                                                                        if i == page_occ - 1 {
-
-                                                                            page_not_ended = true;
-                                                                            let text = res.as_ref().unwrap()[init.unwrap()..]._substr(pos_pageno.unwrap(), res.as_ref().unwrap().len());
-                                                                            let img_occ = text.matches("<img").count();
-                                                                            let mut pos = text.find("<img");
-                                                                            if img_occ > 0 {
-                                                                                if pos.is_some() {
-                                                                                    let mut displacement: usize = 0;
-                                                                                    for i in 0..img_occ {
-                                                                                        let mut s1 = String::from("OEBPS/");
-                                                                                        let mut app = text[pos.unwrap() + 3 + displacement..].find("src=");
-                                                                                        for c in text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].chars() {
-                                                                                            if c == '"' {
-                                                                                                break;
-                                                                                            } else {
-                                                                                                s1.push(c);
-                                                                                            }
-                                                                                        }
-                                                                                        let (width, height) = match blob_size(archive.get_entry(s1.clone()).unwrap().as_slice()) {
-                                                                                            Ok(dim) => { (dim.width, dim.height) }
-                                                                                            Err(why) => {
-                                                                                                println!("Error getting dimensions: {:?}", why);
-                                                                                                (0, 0)
-                                                                                            }
-                                                                                        };
-
-                                                                                        let mut r;
-
-                                                                                        if s1.to_lowercase().contains("jpg") || s1.to_lowercase().contains("jpeg") {
-                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Jpeg).unwrap();
-                                                                                        } else if s1.to_lowercase().contains("png") {
-                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Png).unwrap();
-                                                                                        } else if s1.to_lowercase().contains("gif") {
-                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Gif).unwrap();
-                                                                                        } else if s1.to_lowercase().contains("webp") {
-                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::WebP).unwrap();
-                                                                                        } else if s1.to_lowercase().contains("pnm") {
-                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Pnm).unwrap();
-                                                                                        } else if s1.to_lowercase().contains("tiff") {
-                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tiff).unwrap();
-                                                                                        } else if s1.to_lowercase().contains("tga") {
-                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tga).unwrap();
-                                                                                        } else if s1.to_lowercase().contains("bmp") {
-                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Bmp).unwrap();
-                                                                                        } else if s1.to_lowercase().contains("ico") {
-                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Ico).unwrap();
-                                                                                        } else if s1.to_lowercase().contains("hdr") {
-                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Hdr).unwrap();
-                                                                                        } else {
-                                                                                            panic!("Formato non supportato");
-                                                                                        }
-                                                                                        let result = r.into_bytes();
-                                                                                        data.ebook[page_no].images.push_back(ImageOfPage::from(Vector::from(result), width, height));
-                                                                                        let resapp = text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].find("<img");
-                                                                                        displacement = pos.unwrap() + 3 + app.unwrap() + 5 + displacement;
-                                                                                        pos = resapp;
-                                                                                    }
-                                                                                }
-                                                                            }
-
-                                                                            data.ebook[page_no].text.push_str(text.as_str());
-                                                                            page_no += 1;
-
-                                                                        } else {
-
-                                                                            let next_page = res.as_ref().unwrap()[pos_pageno.unwrap() + 34 ..].find("<span class=\"x-ebookmaker-pageno\"");
-                                                                            let text = res.as_ref().unwrap()[init.unwrap()..]._substr(pos_pageno.unwrap(), next_page.unwrap());
-                                                                            let img_occ = text.matches("<img").count();
-                                                                            let mut pos = text.find("<img");
-                                                                            if img_occ > 0 {
-                                                                                if pos.is_some() {
-                                                                                    let mut displacement: usize = 0;
-                                                                                    for i in 0..img_occ {
-                                                                                        let mut s1 = String::from("OEBPS/");
-                                                                                        let mut app = text[pos.unwrap() + 3 + displacement..].find("src=");
-                                                                                        for c in text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].chars() {
-                                                                                            if c == '"' {
-                                                                                                break;
-                                                                                            } else {
-                                                                                                s1.push(c);
-                                                                                            }
-                                                                                        }
-                                                                                        let (width, height) = match blob_size(archive.get_entry(s1.clone()).unwrap().as_slice()) {
-                                                                                            Ok(dim) => { (dim.width, dim.height) }
-                                                                                            Err(why) => {
-                                                                                                println!("Error getting dimensions: {:?}", why);
-                                                                                                (0, 0)
-                                                                                            }
-                                                                                        };
-
-                                                                                        let mut r;
-
-                                                                                        if s1.to_lowercase().contains("jpg") || s1.to_lowercase().contains("jpeg") {
-                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Jpeg).unwrap();
-                                                                                        } else if s1.to_lowercase().contains("png") {
-                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Png).unwrap();
-                                                                                        } else if s1.to_lowercase().contains("gif") {
-                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Gif).unwrap();
-                                                                                        } else if s1.to_lowercase().contains("webp") {
-                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::WebP).unwrap();
-                                                                                        } else if s1.to_lowercase().contains("pnm") {
-                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Pnm).unwrap();
-                                                                                        } else if s1.to_lowercase().contains("tiff") {
-                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tiff).unwrap();
-                                                                                        } else if s1.to_lowercase().contains("tga") {
-                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tga).unwrap();
-                                                                                        } else if s1.to_lowercase().contains("bmp") {
-                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Bmp).unwrap();
-                                                                                        } else if s1.to_lowercase().contains("ico") {
-                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Ico).unwrap();
-                                                                                        } else if s1.to_lowercase().contains("hdr") {
-                                                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Hdr).unwrap();
-                                                                                        } else {
-                                                                                            panic!("Formato non supportato");
-                                                                                        }
-                                                                                        let result = r.into_bytes();
-                                                                                        data.ebook[page_no].images.push_back(ImageOfPage::from(Vector::from(result), width, height));
-                                                                                        let resapp = text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].find("<img");
-                                                                                        displacement = pos.unwrap() + 3 + app.unwrap() + 5 + displacement;
-                                                                                        pos = resapp;
-                                                                                    }
-                                                                                }
-                                                                            }
-
-                                                                            data.ebook[page_no].text.push_str(text.as_str());
-                                                                            pos_pageno = next_page;
-
-                                                                            data.ebook.push_back(Page::new());
-                                                                            page_no += 1;
-                                                                        }
-
-
-                                                                    }
-                                                                }
-                                */
                                 //TODO: revisionare una volta fatto il salvataggio (per la questione relativa al segnalibro:
                                 // quando chiudo l'app, la prossima riapertura mi riporta all'ultima pagina letta (?))
                                 // let res = archive.get_entry_as_str(f);
@@ -901,12 +634,7 @@ impl AppDelegate<AppState> for Delegate {
                                                         (0, 0)
                                                     }
                                                 };
-                                                /*v = archive.get_entry(s1.clone());
-                                                if x == 0{
-                                                    if let Ok(mut file) = File::create("img.jpeg") {
-                                                        file.write_all(&v.unwrap().clone().as_slice());
-                                                    }
-                                                }*/
+
                                                 let mut r;
                                                 if s1.to_lowercase().contains("jpg") || s1.to_lowercase().contains("jpeg") {
                                                     r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Jpeg).unwrap();

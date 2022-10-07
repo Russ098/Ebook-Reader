@@ -111,7 +111,7 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
 
 
         let mut str_page = String::new();
-        str_page.push_str(state.current_page.to_string().as_str());
+        str_page.push_str((state.current_page + 1).to_string().as_str());
         str_page.push_str("\n\n");
         let rl_page = Label::new(str_page)
             .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
@@ -180,7 +180,7 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
 
 
                 let mut str_page = String::new();
-                str_page.push_str((state.current_page + 1).to_string().as_str());
+                str_page.push_str((state.current_page + 2).to_string().as_str());
                 str_page.push_str("\n\n");
                 let rl_page = Label::new(str_page)
                     .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))

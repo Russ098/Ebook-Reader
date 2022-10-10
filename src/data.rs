@@ -19,6 +19,8 @@ use crate::view::build_widget;
 use serde::Serialize;
 use serde::Deserialize;
 use serde_json::json;
+use voca_rs::strip::strip_tags;
+
 
 const SIZE_FONT: f64 = 40.0;
 
@@ -67,7 +69,6 @@ impl Rebuilder {
 
 impl Widget<AppState> for Rebuilder {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut AppState, env: &Env) {
-
         if (data.window_size != self.window_size) {
             data.window_size = self.window_size;
         }
@@ -143,6 +144,13 @@ impl Chapter {
             target_page: 0,
         }
     }
+
+    pub fn from(title: String, page: usize) -> Self {
+        Self {
+            title: String::from(title),
+            target_page: page,
+        }
+    }
 }
 
 #[derive(Clone, Data, Serialize, Deserialize)]
@@ -161,7 +169,6 @@ impl Json_struct {
 }
 
 
-
 #[derive(Clone, Data, Lens, Serialize, Deserialize)]
 pub struct AppState {
     pub font_size: String,
@@ -172,6 +179,10 @@ pub struct AppState {
     pub title: String,
     pub chapters: Vector<Chapter>,
     pub saves: Json_struct,
+    pub edit_mode: bool,
+    pub display_menu: bool,
+    pub new_bookmark: bool,
+    pub string_bookmark: String,
 }
 
 impl AppState {
@@ -185,6 +196,11 @@ impl AppState {
             title: String::new(),
             chapters: Vector::<Chapter>::new(),
             saves: Json_struct::new(),
+            edit_mode : false,
+            display_menu: false,
+            new_bookmark: false,
+            string_bookmark: String::new(),
+
         }
     }
 
@@ -211,8 +227,7 @@ impl AppState {
                 .show_alert();
         } else {
             //TODO: Fare la vera funzione
-
-            println!("Ebook non vuoto");
+            //data.edit_mode = true;
             data.load_from_json();
         }
     }
@@ -225,12 +240,30 @@ impl AppState {
                 .set_title("Ebook not selected")
                 .show_alert();
         } else {
-
             data.saves.last_page = data.current_page;
             //TODO: aggiornare anche i bookmarks
             data.save_to_json();
         }
     }
+
+    pub fn click_bookmark_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
+        if data.ebook.len() == 0 {
+            let dialog = MessageDialog::new()
+                .set_type(MessageType::Info)
+                .set_text("Please select an Ebook to enable this function.")
+                .set_title("Ebook not selected")
+                .show_alert();
+        } else {/*
+            data.saves.last_page = data.current_page;
+            //TODO: aggiornare anche i bookmarks
+
+            data.save_to_json();*/
+
+            data.new_bookmark = !data.new_bookmark;
+
+        }
+    }
+
 
     pub fn click_single_page_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         if data.ebook.len() == 0 {
@@ -311,8 +344,56 @@ impl AppState {
         }
     }
 
-    pub fn save_to_json(&self) {
+    pub fn click_display_menu_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
 
+        if data.ebook.len() == 0 {
+            let dialog = MessageDialog::new()
+                .set_type(MessageType::Info)
+                .set_text("Please select an Ebook to enable this function.")
+                .set_title("Ebook not selected")
+                .show_alert();
+        } else {
+            data.display_menu = !data.display_menu;
+        }
+
+    }
+
+    pub fn click_confirm_bookmark_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
+
+        if data.ebook.len() == 0 {
+            let dialog = MessageDialog::new()
+                .set_type(MessageType::Info)
+                .set_text("Please select an Ebook to enable this function.")
+                .set_title("Ebook not selected")
+                .show_alert();
+        } else {
+            data.saves.bookmarks.push_back((data.string_bookmark.clone(), data.current_page.clone()));
+            data.save_to_json();
+            data.string_bookmark = String::new();
+            data.new_bookmark = false;
+        }
+
+    }
+
+    pub fn click_reject_bookmark_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
+
+        if data.ebook.len() == 0 {
+            let dialog = MessageDialog::new()
+                .set_type(MessageType::Info)
+                .set_text("Please select an Ebook to enable this function.")
+                .set_title("Ebook not selected")
+                .show_alert();
+        } else {
+
+            data.string_bookmark = String::new();
+            data.new_bookmark = false;
+
+        }
+
+    }
+
+
+    pub fn save_to_json(&self) {
         let serialized = serde_json::to_string(&self.saves).unwrap();
 
         let filename = self.title.clone() + ".json";
@@ -323,8 +404,6 @@ impl AppState {
         let mut p = String::from(path.to_str().unwrap());
         p.push_str(filename.as_str());
         std::fs::write(p, serialized).unwrap();
-        println!("Ho salvato in: {}", filename);
-
     }
 
     pub fn load_from_json(&mut self) {
@@ -341,12 +420,13 @@ impl AppState {
 
                 self.saves = u;
                 self.current_page = self.saves.last_page;
-
             }
-            Err(_) => {},
+            Err(_) => {}
         }
     }
 }
+
+pub const GO_TO_POS: Selector<usize> = Selector::new("go_to_pos");
 
 pub struct Delegate;
 
@@ -360,11 +440,17 @@ impl AppDelegate<AppState> for Delegate {
         _env: &Env,
     ) -> Handled {
 
+        if cmd.is(GO_TO_POS) {
+            let pos = cmd.get_unchecked(GO_TO_POS);
+            data.current_page = *pos;
+        }
+
+
+
         if let Some(file_info) = cmd.get(commands::OPEN_FILE) {
             match EpubArchive::new(file_info.clone().path())
             {
                 Ok(mut archive) => {
-
                     if data.ebook.len() > 0 {
                         //TODO: aggiornare anche i bookmarks
                         data.saves.last_page = data.current_page;
@@ -378,12 +464,16 @@ impl AppDelegate<AppState> for Delegate {
                         .next().unwrap().to_string();
                     data.saves.last_page = 0;
                     data.saves.bookmarks.clear();
+                    data.display_menu = false;
+                    data.edit_mode = false;
+                    data.new_bookmark = false;
 
                     data.load_from_json();
 
                     let mut page_no = 0;
                     let mut page_not_ended = false;
-
+                    let mut chapter_title: String = String::new();
+                    let mut chapter_number: usize = 1;
 
                     for f in archive.files.clone() {
                         if f.contains("OEBPS") && f.contains("htm.html") {
@@ -394,6 +484,34 @@ impl AppDelegate<AppState> for Delegate {
 
                             if res.is_ok() {
                                 let init = res.as_ref().unwrap().find("<body");
+
+                                if res.as_ref().unwrap()[init.unwrap()..].contains("START OF THIS PROJECT GUTENBERG EBOOK"){
+                                    chapter_title = "START OF THIS PROJECT GUTENBERG EBOOK".to_string();
+                                }
+                                else if res.as_ref().unwrap()[init.unwrap()..].contains("END OF THIS PROJECT GUTENBERG EBOOK"){
+                                    chapter_title = "END OF THIS PROJECT GUTENBERG EBOOK".to_string();
+                                }
+                                else if res.as_ref().unwrap()[init.unwrap()..].contains("CONTENTS") {
+                                    chapter_title = "CONTENTS".to_string();
+                                }else if res.as_ref().unwrap()[init.unwrap()..].contains("pgepubid00000"){
+                                    let inizio = res.as_ref().unwrap().find("<title>").unwrap();
+                                    let fine = res.as_ref().unwrap().find("</title>").unwrap();
+                                    chapter_title = strip_tags(&res.as_ref().unwrap()[inizio..fine].replace("\n", "").trim_start().trim_end());
+                                }
+                                else if res.as_ref().unwrap()[init.unwrap()..].contains("PREFACE") {
+                                    chapter_title = "PREFACE".to_string();
+                                } else if res.as_ref().unwrap()[init.unwrap()..].contains("ILLUSTRATIONS") {
+                                    chapter_title = "ILLUSTRATIONS".to_string();
+                                }else if res.as_ref().unwrap().find("<div class=\"chapter\"").is_none(){
+                                    chapter_title = "POSTFACE".to_string();
+                                } else {
+                                    chapter_title = strip_tags(&res.as_ref().unwrap()[res.as_ref().unwrap().find("<div class=\"chapter\"").unwrap()..res.as_ref().unwrap().find("</div>").unwrap()])
+                                        .replace("\n", " ").trim_start().trim_end().to_string();
+
+                                }
+                                data.chapters.push_back(Chapter::from(chapter_title, page_no));
+
+
                                 let page_occ = res.as_ref().unwrap()[init.unwrap()..].matches("<span class=\"x-ebookmaker-pageno\"").count();
 
                                 if page_occ > 0 {

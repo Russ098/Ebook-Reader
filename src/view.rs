@@ -83,6 +83,10 @@ fn settings_row() -> impl Widget<AppState> {
     let double_page_button = Button::new("Double Page").padding(5.0).on_click(AppState::click_double_page_button);
     let plus_button = Button::new("+").padding(5.0).on_click(AppState::click_plus_button);
     let min_button = Button::new("-").padding(5.0).on_click(AppState::click_min_button);
+
+
+    //TODO: RENDERE SOLO NUMERICO LA TEXTBOX PER IL FONT SIZE
+
     let edit_size_text = TextBox::new()
         .with_placeholder("50")
         .lens(AppState::font_size);
@@ -116,6 +120,7 @@ pub fn build_ui() -> impl Widget<AppState> {
 //TODO: Aggiustare il controllo per la dimensione del font quando viene messa a 0 oppure cancellata dall'utente
 
 pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
+
     //titolo(?), testo, immagini
     //SizedBox::new(Scroll::new(RawLabel::new().lens(AppState::rich_text))).expand_height()
     let mut c = Flex::column();
@@ -128,6 +133,7 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
     let mut c2 = Flex::column();
 
 
+
     //TODO: Per i file .html che non presentano all'interno un "pageno", la pagina cambia ogni volta che cambia il file html che viene aperto.
     // Altrimenti la pagina viene riempita fin quando non si incontra un tag span che contiene "pageno".
     // NOTA: se il file .html corrente possiede del testo che non è seguito da un pageno, allora si controllerà il successivo file .html e, se contiene un pageno, si continuerà a
@@ -135,7 +141,8 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
     // numero del capitolo, eventuali flag da usare
 
 
-    if state.ebook.len() > 0 {
+    if state.ebook.len() > 0 && state.font_size.len() > 0 && state.font_size != "0"{
+
         let mut str_page = String::new();
         str_page.push_str((state.current_page + 1).to_string().as_str());
         str_page.push_str("\n\n");
@@ -274,19 +281,38 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
 
     if state.double_page {
         let mut c3 = Flex::row();
-        if state.display_menu {
+        if state.display_menu && state.font_size.len() > 0 && state.font_size != "0"{
             let mut c4 = Flex::column();
             c4.add_child(Padding::new((0., 10.), Label::new("BOOKMARKS")
                 .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
                 .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size)));
+
+            //TODO: togliere il cliccabile negli spazi tra i capitoli
+
+
             if state.saves.bookmarks.len() > 0 {
                 for bookmark in state.saves.bookmarks.clone() {
-                    c4.add_child(ControllerHost::new(Label::new(bookmark.0.clone())
+                    let mut ro = Flex::row();
+
+                    let mut ch = ControllerHost::new(Label::new(bookmark.0.clone() + " - pag. " + (bookmark.1.clone() + 1).to_string().as_str())
                                                          .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
                                                          .with_text_color(KeyOrValue::Concrete(Color::LIME))
                                                          .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size), Click::new(move |ctx, data, env| {
                         ctx.submit_command(GO_TO_POS.with(bookmark.1.clone()));
-                    })))
+                    }));
+
+                    ro.add_flex_child(ch, 1.0);
+
+
+                    let x_button = Label::new("x")
+                        .with_text_color(KeyOrValue::Concrete(Color::RED))
+                        .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
+                        .on_click(move |ctx, data, env| {
+                            ctx.submit_command(DELETE_BOOKMARK.with(bookmark.clone()));
+                        });
+
+                    ro.add_flex_child(x_button, 0.6);
+                    c4.add_child(ro);
                 }
             } else {
                 c4.add_child(Padding::new((0., 10.), Label::new("No bookmarks available")
@@ -297,7 +323,7 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
                 .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
                 .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size)));
             for chapter in state.chapters.clone() {
-                c4.add_child(ControllerHost::new(Label::new(chapter.title.clone())
+                c4.add_child(ControllerHost::new(Label::new(chapter.title.clone() + "\n")
                                                      .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
                                                      .with_text_color(KeyOrValue::Concrete(Color::LIME))
                                                      .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size), Click::new(move |ctx, data, env| {
@@ -314,19 +340,37 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
         scroll = Scroll::new(c3.cross_axis_alignment(CrossAxisAlignment::Start)).vertical();
     } else {
         let mut c3 = Flex::row();
-        if state.display_menu {
+        if state.display_menu && state.font_size.len() > 0 && state.font_size != "0" {
             let mut c4 = Flex::column();
             c4.add_child(Padding::new((0., 10.), Label::new("BOOKMARKS")
                 .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
                 .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size)));
+
+            //TODO: togliere il cliccabile negli spazi tra i capitoli
+
             if state.saves.bookmarks.len() > 0 {
                 for bookmark in state.saves.bookmarks.clone() {
-                    c4.add_child(ControllerHost::new(Label::new(bookmark.0.clone())
+                    let mut ro = Flex::row();
+
+                    let mut ch = ControllerHost::new(Label::new(bookmark.0.clone() + " - pag. " + (bookmark.1.clone() + 1).to_string().as_str())
                                                          .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
                                                          .with_text_color(KeyOrValue::Concrete(Color::LIME))
                                                          .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size), Click::new(move |ctx, data, env| {
                         ctx.submit_command(GO_TO_POS.with(bookmark.1.clone()));
-                    })))
+                    }));
+
+                    ro.add_flex_child(ch, 1.0);
+
+
+                    let x_button = Label::new("x")
+                        .with_text_color(KeyOrValue::Concrete(Color::RED))
+                        .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
+                        .on_click(move |ctx, data, env| {
+                            ctx.submit_command(DELETE_BOOKMARK.with(bookmark.clone()));
+                        });
+
+                    ro.add_flex_child(x_button, 0.5);
+                    c4.add_child(ro);
                 }
             } else {
                 c4.add_child(Padding::new((0., 10.), Label::new("No bookmarks available")
@@ -337,7 +381,7 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
                 .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
                 .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size)));
             for chapter in state.chapters.clone() {
-                c4.add_child(ControllerHost::new(Label::new(chapter.title.clone())
+                c4.add_child(ControllerHost::new(Label::new(chapter.title.clone() + "\n")
                                                      .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
                                                      .with_text_color(KeyOrValue::Concrete(Color::LIME))
                                                      .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size), Click::new(move |ctx, data, env| {

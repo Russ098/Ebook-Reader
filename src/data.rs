@@ -22,7 +22,7 @@ use serde_json::json;
 use voca_rs::strip::strip_tags;
 
 
-const SIZE_FONT: f64 = 40.0;
+const SIZE_FONT: f64 = 20.0;
 
 //TODO: implemenatare una struttura che gestisca i capitolo secondo formattazione html v[0]="<p>Test<p>" v[1]="<img>....<img>"
 #[derive(Clone, Data, Lens, Serialize, Deserialize)]
@@ -196,7 +196,7 @@ impl AppState {
             title: String::new(),
             chapters: Vector::<Chapter>::new(),
             saves: Json_struct::new(),
-            edit_mode : false,
+            edit_mode: false,
             display_menu: false,
             new_bookmark: false,
             string_bookmark: String::new(),
@@ -215,8 +215,11 @@ impl AppState {
         data.min();
     }
     fn min(&mut self) {
-        let new_size = self.font_size.parse::<f64>().unwrap() - 1.;
-        self.font_size = new_size.to_string();
+        if self.font_size.parse::<f64>().unwrap() > 0. {
+            let new_size = self.font_size.parse::<f64>().unwrap() - 1.;
+            self.font_size = new_size.to_string();
+        }
+
     }
     pub fn click_edit_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         if data.ebook.len() == 0 {
@@ -253,14 +256,14 @@ impl AppState {
                 .set_text("Please select an Ebook to enable this function.")
                 .set_title("Ebook not selected")
                 .show_alert();
-        } else {/*
-            data.saves.last_page = data.current_page;
-            //TODO: aggiornare anche i bookmarks
+        } else {
+            /*
+                        data.saves.last_page = data.current_page;
+                        //TODO: aggiornare anche i bookmarks
 
-            data.save_to_json();*/
+                        data.save_to_json();*/
 
             data.new_bookmark = !data.new_bookmark;
-
         }
     }
 
@@ -345,7 +348,6 @@ impl AppState {
     }
 
     pub fn click_display_menu_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
-
         if data.ebook.len() == 0 {
             let dialog = MessageDialog::new()
                 .set_type(MessageType::Info)
@@ -355,11 +357,9 @@ impl AppState {
         } else {
             data.display_menu = !data.display_menu;
         }
-
     }
 
     pub fn click_confirm_bookmark_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
-
         if data.ebook.len() == 0 {
             let dialog = MessageDialog::new()
                 .set_type(MessageType::Info)
@@ -367,16 +367,41 @@ impl AppState {
                 .set_title("Ebook not selected")
                 .show_alert();
         } else {
-            data.saves.bookmarks.push_back((data.string_bookmark.clone(), data.current_page.clone()));
-            data.save_to_json();
-            data.string_bookmark = String::new();
-            data.new_bookmark = false;
-        }
 
+            if data.string_bookmark.len() == 0{
+                let dialog = MessageDialog::new()
+                    .set_type(MessageType::Warning)
+                    .set_text("Please insert a title in order to create a new bookmark")
+                    .set_title("No title for the bookmark")
+                    .show_alert();
+                return;
+            }
+
+
+
+            let mut found = false;
+            for bookmark in data.saves.bookmarks.clone() {
+                if bookmark.1 == data.current_page {
+                    found = true;
+                }
+            }
+
+            if found {
+                let dialog = MessageDialog::new()
+                    .set_type(MessageType::Warning)
+                    .set_text("You've already inserted a bookmark for this page")
+                    .set_title("Bookmark already inserted")
+                    .show_alert();
+            } else {
+                data.saves.bookmarks.push_back((data.string_bookmark.clone(), data.current_page.clone()));
+                data.save_to_json();
+                data.string_bookmark = String::new();
+                data.new_bookmark = false;
+            }
+        }
     }
 
     pub fn click_reject_bookmark_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
-
         if data.ebook.len() == 0 {
             let dialog = MessageDialog::new()
                 .set_type(MessageType::Info)
@@ -384,12 +409,9 @@ impl AppState {
                 .set_title("Ebook not selected")
                 .show_alert();
         } else {
-
             data.string_bookmark = String::new();
             data.new_bookmark = false;
-
         }
-
     }
 
 
@@ -427,6 +449,7 @@ impl AppState {
 }
 
 pub const GO_TO_POS: Selector<usize> = Selector::new("go_to_pos");
+pub const DELETE_BOOKMARK: Selector<(String, usize)> = Selector::new("delete_bookmark");
 
 pub struct Delegate;
 
@@ -439,12 +462,25 @@ impl AppDelegate<AppState> for Delegate {
         data: &mut AppState,
         _env: &Env,
     ) -> Handled {
-
         if cmd.is(GO_TO_POS) {
             let pos = cmd.get_unchecked(GO_TO_POS);
             data.current_page = *pos;
         }
 
+        if cmd.is(DELETE_BOOKMARK) {
+            let pos = cmd.get_unchecked(DELETE_BOOKMARK);
+            let mut i = 0;
+            for bookmark in data.saves.bookmarks.clone() {
+                if bookmark.eq(pos) {
+                    break;
+                } else {
+                    i += 1;
+                }
+            }
+
+            data.saves.bookmarks.remove(i);
+            data.save_to_json();
+        }
 
 
         if let Some(file_info) = cmd.get(commands::OPEN_FILE) {
@@ -485,29 +521,25 @@ impl AppDelegate<AppState> for Delegate {
                             if res.is_ok() {
                                 let init = res.as_ref().unwrap().find("<body");
 
-                                if res.as_ref().unwrap()[init.unwrap()..].contains("START OF THIS PROJECT GUTENBERG EBOOK"){
+                                if res.as_ref().unwrap()[init.unwrap()..].contains("START OF THIS PROJECT GUTENBERG EBOOK") {
                                     chapter_title = "START OF THIS PROJECT GUTENBERG EBOOK".to_string();
-                                }
-                                else if res.as_ref().unwrap()[init.unwrap()..].contains("END OF THIS PROJECT GUTENBERG EBOOK"){
+                                } else if res.as_ref().unwrap()[init.unwrap()..].contains("END OF THIS PROJECT GUTENBERG EBOOK") {
                                     chapter_title = "END OF THIS PROJECT GUTENBERG EBOOK".to_string();
-                                }
-                                else if res.as_ref().unwrap()[init.unwrap()..].contains("CONTENTS") {
+                                } else if res.as_ref().unwrap()[init.unwrap()..].contains("CONTENTS") {
                                     chapter_title = "CONTENTS".to_string();
-                                }else if res.as_ref().unwrap()[init.unwrap()..].contains("pgepubid00000"){
+                                } else if res.as_ref().unwrap()[init.unwrap()..].contains("pgepubid00000") {
                                     let inizio = res.as_ref().unwrap().find("<title>").unwrap();
                                     let fine = res.as_ref().unwrap().find("</title>").unwrap();
                                     chapter_title = strip_tags(&res.as_ref().unwrap()[inizio..fine].replace("\n", "").trim_start().trim_end());
-                                }
-                                else if res.as_ref().unwrap()[init.unwrap()..].contains("PREFACE") {
+                                } else if res.as_ref().unwrap()[init.unwrap()..].contains("PREFACE") {
                                     chapter_title = "PREFACE".to_string();
                                 } else if res.as_ref().unwrap()[init.unwrap()..].contains("ILLUSTRATIONS") {
                                     chapter_title = "ILLUSTRATIONS".to_string();
-                                }else if res.as_ref().unwrap().find("<div class=\"chapter\"").is_none(){
+                                } else if res.as_ref().unwrap().find("<div class=\"chapter\"").is_none() {
                                     chapter_title = "POSTFACE".to_string();
                                 } else {
                                     chapter_title = strip_tags(&res.as_ref().unwrap()[res.as_ref().unwrap().find("<div class=\"chapter\"").unwrap()..res.as_ref().unwrap().find("</div>").unwrap()])
                                         .replace("\n", " ").trim_start().trim_end().to_string();
-
                                 }
                                 data.chapters.push_back(Chapter::from(chapter_title, page_no));
 

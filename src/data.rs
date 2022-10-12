@@ -1,5 +1,5 @@
 use std::error::Error;
-use druid::{Data, Lens, EventCtx, Env, ArcStr, KeyOrValue, FontFamily, commands, AppDelegate, DelegateCtx, Target, Command, Handled, ImageBuf, Widget, WidgetExt, Event, LifeCycleCtx, LifeCycle, UpdateCtx, LayoutCtx, BoxConstraints, Size, PaintCtx, WidgetId, WindowHandle, LensExt, Selector};
+use druid::{Data, Lens, EventCtx, Env, ArcStr, KeyOrValue, FontFamily, commands, AppDelegate, DelegateCtx, Target, Command, Handled, ImageBuf, Widget, WidgetExt, Event, LifeCycleCtx, LifeCycle, UpdateCtx, LayoutCtx, BoxConstraints, Size, PaintCtx, WidgetId, WindowHandle, LensExt, Selector, WindowDesc, AppLauncher};
 use druid::text::{RichText, Attribute};
 use epub::doc::EpubDoc;
 use std::fs::File;
@@ -12,14 +12,16 @@ use druid::widget::{Image, SizedBox};
 use epub::archive::EpubArchive;
 use imagesize::{size, ImageSize, blob_size};
 use druid::piet::ImageFormat;
+use fltk::window::{SingleWindow, Window};
 use image::imageops::resize;
 use native_dialog::{MessageDialog, MessageType};
 use voca_rs::Voca;
-use crate::view::build_widget;
+use crate::view::{build_ui_edit_mode, build_widget};
 use serde::Serialize;
 use serde::Deserialize;
 use serde_json::json;
 use voca_rs::strip::strip_tags;
+use crate::build_ui;
 
 
 const SIZE_FONT: f64 = 20.0;
@@ -183,6 +185,7 @@ pub struct AppState {
     pub display_menu: bool,
     pub new_bookmark: bool,
     pub string_bookmark: String,
+    pub current_page_text : String,
 }
 
 impl AppState {
@@ -200,6 +203,7 @@ impl AppState {
             display_menu: false,
             new_bookmark: false,
             string_bookmark: String::new(),
+            current_page_text: String::new(),
 
         }
     }
@@ -230,7 +234,15 @@ impl AppState {
                 .show_alert();
         } else {
             //TODO: Fare la vera funzione
-            //data.edit_mode = true;
+            data.edit_mode = !data.edit_mode;
+
+            data.current_page_text = data.ebook.get(data.current_page).unwrap().clone().text;
+
+            let new_win = WindowDesc::new(build_ui_edit_mode)
+                .title("Edit Ebook")
+                .window_size(Size::new(1200., 700.));
+            _ctx.new_window(new_win);
+
             data.load_from_json();
         }
     }

@@ -6,6 +6,7 @@ use druid::piet::ImageFormat;
 use druid::text::RichText;
 use crate::data::*;
 use druid::widget::{TextBox, Button, RawLabel, Scroll, SizedBox, LensWrap, Image, FillStrat, Label, CrossAxisAlignment, LineBreaking, Padding, Click, ControllerHost};
+use fltk::app::App;
 use image::ImageFormat::Ico;
 use imagesize::size;
 use voca_rs::strip::strip_tags;
@@ -49,10 +50,11 @@ fn option_row() -> impl Widget<AppState> {
 
     let open_button = Button::new("Open").padding(5.0).on_click(move |ctx, _, _| {
         ctx.submit_command(druid::commands::SHOW_OPEN_PANEL.with(open_dialog_options.clone()))
+
     });
     let edit_button = Button::new("Edit").padding(5.0).on_click(AppState::click_edit_button);
     let save_button = Button::new("Save").padding(5.0).on_click(AppState::click_save_button);
-    let bookmark_button = Button::new("Bookmark").padding(5.0).on_click(AppState::click_bookmark_button);
+    //let bookmark_button = Button::new("Bookmark").padding(5.0).on_click(AppState::click_bookmark_button);
     let previous_button = Button::new("Previous Page").padding(5.0).on_click(AppState::click_previous_button);
     let next_button = Button::new("Next Page").padding(5.0).on_click(AppState::click_next_button);
 
@@ -60,7 +62,7 @@ fn option_row() -> impl Widget<AppState> {
         .with_child(open_button)
         .with_child(edit_button)
         .with_child(save_button)
-        .with_child(bookmark_button)
+        //.with_child(bookmark_button)
         .align_left();
 
     let r2 = Flex::row()
@@ -117,12 +119,66 @@ pub fn build_ui() -> impl Widget<AppState> {
     return c;
 }
 
+pub fn build_ui_edit_mode() -> impl Widget<AppState> {
+    let mut c = Flex::column();
+
+    c.add_child(option_row_edit_mode());
+
+    c.add_flex_child(TextBox::new().lens(AppState::current_page_text).expand_width(),1.);
+
+
+    /*
+    c.add_child(option_edit_row());
+    c.add_child(bookmark_row());
+    c.add_flex_child(Rebuilder::new(), 1.0);
+    c.add_child(settings_row());
+
+    */
+
+    return c;
+}
+
+fn option_row_edit_mode() -> impl Widget<AppState> {
+    let epub = FileSpec::new("Epub file", &["epub"]);
+    let default_save_name = String::from("MyFile.epub");
+
+    let save_dialog_options = FileDialogOptions::new()
+        .allowed_types(vec![epub])
+        .default_type(epub)
+        .default_name(default_save_name)
+        .name_label("Target")
+        .title("Choose a target for this lovely file")
+        .button_text("Export");
+
+    let open_dialog_options = save_dialog_options
+        .clone()
+        .default_name("MySavedFile.epub")
+        .name_label("Source")
+        .title("Where did you put that file?")
+        .button_text("Import");
+
+
+    let save_button = Button::new("Save new version").padding(5.0).on_click(move |ctx, _, _| {
+        ctx.submit_command(druid::commands::SHOW_SAVE_PANEL.with(save_dialog_options.clone()))
+    });
+
+
+    let r1 = Flex::row()
+        .with_child(save_button)
+        .align_left();
+
+    Flex::row()
+        .with_flex_child(r1, 1.0)
+        .expand_width()
+        .background(Color::WHITE)
+        .border(Color::GRAY, 0.5)
+}
+
 //TODO: Aggiustare il controllo per la dimensione del font quando viene messa a 0 oppure cancellata dall'utente
 
 pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
 
-    //titolo(?), testo, immagini
-    //SizedBox::new(Scroll::new(RawLabel::new().lens(AppState::rich_text))).expand_height()
+
     let mut c = Flex::column();
     let mut src = "".to_string();
     let mut i = 0 as usize;
@@ -131,6 +187,7 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
     let mut image_buf;
     let mut scroll;
     let mut c2 = Flex::column();
+    let mut str_page_editmode = String::new();
 
 
 
@@ -143,10 +200,12 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
 
     if state.ebook.len() > 0 && state.font_size.len() > 0 && state.font_size != "0"{
 
-        let mut str_page = String::new();
-        str_page.push_str((state.current_page + 1).to_string().as_str());
-        str_page.push_str("\n\n");
-        let rl_page = Label::new(str_page)
+
+
+        let mut str_page_number = String::new();
+        str_page_number.push_str((state.current_page + 1).to_string().as_str());
+        str_page_number.push_str("\n\n");
+        let rl_page = Label::new(str_page_number)
             .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
             .with_text_alignment(TextAlignment::Center)
             .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size);
@@ -323,12 +382,13 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
                 .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
                 .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size)));
             for chapter in state.chapters.clone() {
-                c4.add_child(ControllerHost::new(Label::new(chapter.title.clone() + "\n")
+                c4.add_child(ControllerHost::new(Label::new(chapter.title.clone())
                                                      .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
                                                      .with_text_color(KeyOrValue::Concrete(Color::LIME))
                                                      .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size), Click::new(move |ctx, data, env| {
                     ctx.submit_command(GO_TO_POS.with(chapter.target_page.clone()));
-                })))
+                })));
+                c4.add_child(Label::new("\n"));
             }
             c3.add_flex_child(c4, 0.2);
             let padd = Padding::new((20., 0.), c.cross_axis_alignment(CrossAxisAlignment::Start));
@@ -381,12 +441,14 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
                 .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
                 .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size)));
             for chapter in state.chapters.clone() {
-                c4.add_child(ControllerHost::new(Label::new(chapter.title.clone() + "\n")
+                c4.add_child(ControllerHost::new(Label::new(chapter.title.clone())
                                                      .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
                                                      .with_text_color(KeyOrValue::Concrete(Color::LIME))
                                                      .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size), Click::new(move |ctx, data, env| {
                     ctx.submit_command(GO_TO_POS.with(chapter.target_page.clone()));
-                })))
+                })));
+
+                c4.add_child(Label::new("\n"));
             }
             c3.add_flex_child(c4, 0.2);
             let padd = Padding::new((20., 0.), c.cross_axis_alignment(CrossAxisAlignment::Start));

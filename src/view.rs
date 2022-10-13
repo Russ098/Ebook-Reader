@@ -124,7 +124,7 @@ pub fn build_ui_edit_mode() -> impl Widget<AppState> {
 
     c.add_child(option_row_edit_mode());
 
-    c.add_flex_child(TextBox::new().lens(AppState::current_page_text).expand_width(),1.);
+    c.add_flex_child(TextBox::multiline().lens(AppState::current_page_text).expand_width(),1.);
 
 
     /*

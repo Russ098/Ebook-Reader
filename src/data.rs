@@ -1,10 +1,12 @@
 use std::error::Error;
-use druid::{Data, Lens, EventCtx, Env, ArcStr, KeyOrValue, FontFamily, commands, AppDelegate, DelegateCtx, Target, Command, Handled, ImageBuf, Widget, WidgetExt, Event, LifeCycleCtx, LifeCycle, UpdateCtx, LayoutCtx, BoxConstraints, Size, PaintCtx, WidgetId, WindowHandle, LensExt, Selector, WindowDesc, AppLauncher};
+use std::{fs, io};
+use druid::{Data, Lens, EventCtx, Env, ArcStr, KeyOrValue, FontFamily, commands, AppDelegate, DelegateCtx, Target, Command, Handled, ImageBuf, Widget, WidgetExt, Event, LifeCycleCtx, LifeCycle, UpdateCtx, LayoutCtx, BoxConstraints, Size, PaintCtx, WidgetId, WindowHandle, LensExt, Selector, WindowDesc, AppLauncher, FileInfo};
 use druid::text::{RichText, Attribute};
 use epub::doc::EpubDoc;
-use std::fs::File;
-use std::io::{BufReader, Read, Write};
-use std::path::Path;
+use std::fs::{DirEntry, File};
+use std::io::{BufReader, Read, Seek, Write};
+use std::iter::Zip;
+use std::path::{Path, PathBuf};
 use std::str::from_utf8;
 use druid::Event::WindowSize;
 use druid::im::Vector;
@@ -12,6 +14,8 @@ use druid::widget::{Image, SizedBox};
 use epub::archive::EpubArchive;
 use imagesize::{size, ImageSize, blob_size};
 use druid::piet::ImageFormat;
+use fltk::draw::descent;
+use fltk::enums::Cursor::Default;
 use fltk::window::{SingleWindow, Window};
 use image::imageops::resize;
 use native_dialog::{MessageDialog, MessageType};
@@ -21,6 +25,10 @@ use serde::Serialize;
 use serde::Deserialize;
 use serde_json::json;
 use voca_rs::strip::strip_tags;
+use zip::{CompressionMethod, ZipArchive, ZipWriter};
+use zip::result::ZipError;
+use zip::write::FileOptions;
+use walkdir::{WalkDir, DirEntry as OtherDirEntry};
 use crate::build_ui;
 
 
@@ -185,7 +193,8 @@ pub struct AppState {
     pub display_menu: bool,
     pub new_bookmark: bool,
     pub string_bookmark: String,
-    pub current_page_text : String,
+    pub current_page_text: String,
+    pub file_info: String,
 }
 
 impl AppState {
@@ -204,6 +213,7 @@ impl AppState {
             new_bookmark: false,
             string_bookmark: String::new(),
             current_page_text: String::new(),
+            file_info: String::new(),
 
         }
     }
@@ -223,7 +233,6 @@ impl AppState {
             let new_size = self.font_size.parse::<f64>().unwrap() - 1.;
             self.font_size = new_size.to_string();
         }
-
     }
     pub fn click_edit_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         if data.ebook.len() == 0 {
@@ -234,6 +243,64 @@ impl AppState {
                 .show_alert();
         } else {
             //TODO: Fare la vera funzione
+            let mut f = File::create("\\Ebook_Reader\\test.zip");
+            fs::copy(data.file_info.clone(), Path::new("\\Ebook_Reader\\test.zip"));
+
+            let mut path = PathBuf::from("\\Ebook_Reader\\test.zip");
+            let mut dest_path = Path::new("\\Ebook_Reader\\output\\");
+
+
+            // fs::create_dir(dest_path).unwrap();
+
+            let fname = std::path::Path::new(&path);
+            let file = fs::File::open(&fname).unwrap();
+
+            let mut archive = zip::ZipArchive::new(file).unwrap();
+
+            for i in 0..archive.len() {
+                let mut file = archive.by_index(i).unwrap();
+                let outpath = match file.enclosed_name() {
+                    Some(path) => path.to_owned(),
+                    None => continue,
+                };
+
+                {
+                    let comment = file.comment();
+                    if !comment.is_empty() {
+                        println!("File {} comment: {}", i, comment);
+                    }
+                }
+
+                if (file.name()).ends_with('/') {
+                    println!("File {} extracted to \"{}\" primo create", i, outpath.display());
+                    fs::create_dir_all(&outpath).unwrap();
+                } else {
+                    println!(
+                        "File {} extracted to \"{}\" ({} bytes)",
+                        i,
+                        outpath.display(),
+                        file.size()
+                    );
+                    if let Some(p) = outpath.parent() {
+                        if !p.exists() {
+                            println!("P : {}", p.display());
+                            let mut a = dest_path.to_str().unwrap().to_string();
+                            a.push_str(p.to_str().unwrap());
+                            fs::create_dir_all(a).unwrap();
+                        }
+                    }
+                    let mut a2 = dest_path.to_str().unwrap().to_string();
+                    a2.push_str(outpath.to_str().unwrap());
+                    let mut outfile = fs::File::create(a2).unwrap();
+                    io::copy(&mut file, &mut outfile).unwrap();
+                }
+            }
+
+
+            //let mut zip = ZipWriter::new(file);
+            //zip.add_directory("prova", FileOptions::default());
+            doit(dest_path.to_str().unwrap(), "\\Ebook_Reader\\prova.epub", CompressionMethod::Stored);
+
             data.edit_mode = !data.edit_mode;
 
             data.current_page_text = data.ebook.get(data.current_page).unwrap().clone().text;
@@ -246,6 +313,7 @@ impl AppState {
             data.load_from_json();
         }
     }
+
 
     pub fn click_save_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         if data.ebook.len() == 0 {
@@ -379,8 +447,7 @@ impl AppState {
                 .set_title("Ebook not selected")
                 .show_alert();
         } else {
-
-            if data.string_bookmark.len() == 0{
+            if data.string_bookmark.len() == 0 {
                 let dialog = MessageDialog::new()
                     .set_type(MessageType::Warning)
                     .set_text("Please insert a title in order to create a new bookmark")
@@ -388,7 +455,6 @@ impl AppState {
                     .show_alert();
                 return;
             }
-
 
 
             let mut found = false;
@@ -460,6 +526,58 @@ impl AppState {
     }
 }
 
+fn zip_dir<T>(it: &mut dyn Iterator<Item=OtherDirEntry>, prefix: &str, writer: T, method: zip::CompressionMethod)
+                  -> zip::result::ZipResult<()>
+    where T: Write + Seek
+{
+    let mut zip = zip::ZipWriter::new(writer);
+    let options = FileOptions::default()
+        .compression_method(method)
+        .unix_permissions(0o755);
+
+    let mut buffer = Vec::new();
+    for entry in it {
+        let path = entry.path();
+        let name = path.strip_prefix(Path::new(prefix)).unwrap();
+
+        // Write file or directory explicitly
+        // Some unzip tools unzip files with directory paths correctly, some do not!
+        if path.is_file() {
+            println!("adding file {:?} as {:?} ...", path, name);
+            zip.start_file_from_path(name, options)?;
+            let mut f = File::open(path)?;
+
+            f.read_to_end(&mut buffer)?;
+            zip.write_all(&*buffer)?;
+            buffer.clear();
+        } else if name.as_os_str().len() != 0 {
+            // Only if not root! Avoids path spec / warning
+            // and mapname conversion failed error on unzip
+            println!("adding dir {:?} as {:?} ...", path, name);
+            zip.add_directory_from_path(name, options)?;
+        }
+    }
+    zip.finish()?;
+    Result::Ok(())
+}
+
+fn doit(src_dir: &str, dst_file: &str, method: zip::CompressionMethod) -> zip::result::ZipResult<()> {
+    if !Path::new(src_dir).is_dir() {
+        return Err(ZipError::FileNotFound);
+    }
+
+    let path = Path::new(dst_file);
+    let file = File::create(&path).unwrap();
+
+    let walkdir = WalkDir::new(src_dir.to_string());
+    let it = walkdir.into_iter();
+
+    zip_dir(&mut it.filter_map(|e| e.ok()), src_dir, file, method)?;
+
+    Ok(())
+}
+
+
 pub const GO_TO_POS: Selector<usize> = Selector::new("go_to_pos");
 pub const DELETE_BOOKMARK: Selector<(String, usize)> = Selector::new("delete_bookmark");
 
@@ -496,6 +614,7 @@ impl AppDelegate<AppState> for Delegate {
 
 
         if let Some(file_info) = cmd.get(commands::OPEN_FILE) {
+            data.file_info = file_info.clone().path().to_str().unwrap().to_string();
             match EpubArchive::new(file_info.clone().path())
             {
                 Ok(mut archive) => {

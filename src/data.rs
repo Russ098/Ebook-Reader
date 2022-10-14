@@ -1,13 +1,15 @@
 use std::error::Error;
 use std::{fs, io};
-use druid::{Data, Lens, EventCtx, Env, ArcStr, KeyOrValue, FontFamily, commands, AppDelegate, DelegateCtx, Target, Command, Handled, ImageBuf, Widget, WidgetExt, Event, LifeCycleCtx, LifeCycle, UpdateCtx, LayoutCtx, BoxConstraints, Size, PaintCtx, WidgetId, WindowHandle, LensExt, Selector, WindowDesc, AppLauncher, FileInfo};
+use druid::{Data, Lens, EventCtx, Env, ArcStr, KeyOrValue, FontFamily, commands, AppDelegate, DelegateCtx, Target, Command, Handled, ImageBuf, Widget, WidgetExt, Event, LifeCycleCtx, LifeCycle, UpdateCtx, LayoutCtx, BoxConstraints, Size, PaintCtx, WidgetId, WindowHandle, LensExt, Selector, WindowDesc, AppLauncher, FileInfo, WindowId};
 use druid::text::{RichText, Attribute};
 use epub::doc::EpubDoc;
 use std::fs::{DirEntry, File};
 use std::io::{BufReader, Read, Seek, Write};
 use std::iter::Zip;
 use std::path::{Path, PathBuf};
+use std::process::exit;
 use std::str::from_utf8;
+use druid::commands::CLOSE_WINDOW;
 use druid::Event::WindowSize;
 use druid::im::Vector;
 use druid::widget::{Image, SizedBox};
@@ -30,6 +32,11 @@ use zip::{CompressionMethod, ZipArchive, ZipWriter};
 use zip::result::ZipError;
 use zip::write::FileOptions;
 use walkdir::{WalkDir, DirEntry as OtherDirEntry};
+use winit::{
+    event::{Event as Other_Event, WindowEvent},
+    event_loop::EventLoop,
+    window::WindowBuilder,
+};
 use crate::build_ui;
 
 
@@ -242,6 +249,12 @@ impl AppState {
                 .set_text("Please select an Ebook to enable this function.")
                 .set_title("Ebook not selected")
                 .show_alert();
+        } else if data.edit_mode {
+            let dialog = MessageDialog::new()
+                .set_type(MessageType::Warning)
+                .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
+                .set_title("Ebook in edit mode")
+                .show_alert();
         } else {
             //TODO: Fare la vera funzione
 
@@ -251,13 +264,67 @@ impl AppState {
             data.current_page_text = data.ebook[data.current_page].clone().text;
             println!("Data current page: {}", data.current_page_text);
 
+
+
+
+
             let new_win = WindowDesc::new(build_ui_edit_mode)
                 .title("Edit Ebook")
                 .window_size(Size::new(1200., 700.));
+
+
+
+
+/*            let event_loop = EventLoop::new();
+            let window = WindowBuilder::new().build(&event_loop).unwrap();
+
+
+            event_loop.run(move |event, _, control_flow| {
+                // ControlFlow::Poll continuously runs the event loop, even if the OS hasn't
+                // dispatched any events. This is ideal for games and similar applications.
+                control_flow.set_poll();
+
+                // ControlFlow::Wait pauses the event loop if no events are available to process.
+                // This is ideal for non-game applications that only update in response to user
+                // input, and uses significantly less power/CPU time than ControlFlow::Poll.
+                control_flow.set_wait();
+
+                match event {
+                    Other_Event::WindowEvent {
+                        event: WindowEvent::CloseRequested,
+                        ..
+                    } => {
+                        println!("The close button was pressed; stopping");
+                        //_ctx.submit_command(commands::CLOSE_WINDOW.to(new_win.id));
+                    },
+                    Other_Event::MainEventsCleared => {
+                        // Application update code.
+
+                        // Queue a RedrawRequested event.
+                        //
+                        // You only need to call this if you've determined that you need to redraw, in
+                        // applications which do not always need to. Applications that redraw continuously
+                        // can just render here instead.
+                        window.request_redraw();
+                    },
+                    Other_Event::RedrawRequested(_) => {
+                        // Redraw the application.
+                        //
+                        // It's preferable for applications that do not render continuously to render in
+                        // this event rather than in MainEventsCleared, since rendering in here allows
+                        // the program to gracefully handle redraws requested by the OS.
+                    },
+                    _ => ()
+                }
+            });
+
+            */
+
             _ctx.new_window(new_win);
 
-
             data.load_from_json();
+
+
         }
     }
 
@@ -268,6 +335,12 @@ impl AppState {
                 .set_type(MessageType::Info)
                 .set_text("Please select an Ebook to enable this function.")
                 .set_title("Ebook not selected")
+                .show_alert();
+        } else if data.edit_mode {
+            let dialog = MessageDialog::new()
+                .set_type(MessageType::Warning)
+                .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
+                .set_title("Ebook in edit mode")
                 .show_alert();
         } else {
             data.saves.last_page = data.current_page;
@@ -282,6 +355,12 @@ impl AppState {
                 .set_type(MessageType::Info)
                 .set_text("Please select an Ebook to enable this function.")
                 .set_title("Ebook not selected")
+                .show_alert();
+        } else if data.edit_mode {
+            let dialog = MessageDialog::new()
+                .set_type(MessageType::Warning)
+                .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
+                .set_title("Ebook in edit mode")
                 .show_alert();
         } else {
             /*
@@ -302,6 +381,12 @@ impl AppState {
                 .set_text("Please select an Ebook to enable this function.")
                 .set_title("Ebook not selected")
                 .show_alert();
+        } else if data.edit_mode {
+            let dialog = MessageDialog::new()
+                .set_type(MessageType::Warning)
+                .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
+                .set_title("Ebook in edit mode")
+                .show_alert();
         } else {
             //TODO: Fare la vera funzione
             data.double_page = false;
@@ -314,6 +399,12 @@ impl AppState {
                 .set_type(MessageType::Info)
                 .set_text("Please select an Ebook to enable this function.")
                 .set_title("Ebook not selected")
+                .show_alert();
+        } else if data.edit_mode {
+            let dialog = MessageDialog::new()
+                .set_type(MessageType::Warning)
+                .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
+                .set_title("Ebook in edit mode")
                 .show_alert();
         } else {
             //TODO: Fare la vera funzione
@@ -328,6 +419,12 @@ impl AppState {
                 .set_type(MessageType::Info)
                 .set_text("Please select an Ebook to enable this function.")
                 .set_title("Ebook not selected")
+                .show_alert();
+        } else if data.edit_mode {
+            let dialog = MessageDialog::new()
+                .set_type(MessageType::Warning)
+                .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
+                .set_title("Ebook in edit mode")
                 .show_alert();
         } else {
             if data.double_page {
@@ -355,6 +452,12 @@ impl AppState {
                 .set_text("Please select an Ebook to enable this function.")
                 .set_title("Ebook not selected")
                 .show_alert();
+        } else if data.edit_mode {
+            let dialog = MessageDialog::new()
+                .set_type(MessageType::Warning)
+                .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
+                .set_title("Ebook in edit mode")
+                .show_alert();
         } else {
             if data.double_page {
                 if data.current_page < (data.ebook.len() - 2) {
@@ -381,6 +484,12 @@ impl AppState {
                 .set_text("Please select an Ebook to enable this function.")
                 .set_title("Ebook not selected")
                 .show_alert();
+        } else if data.edit_mode {
+            let dialog = MessageDialog::new()
+                .set_type(MessageType::Warning)
+                .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
+                .set_title("Ebook in edit mode")
+                .show_alert();
         } else {
             data.display_menu = !data.display_menu;
         }
@@ -392,6 +501,12 @@ impl AppState {
                 .set_type(MessageType::Info)
                 .set_text("Please select an Ebook to enable this function.")
                 .set_title("Ebook not selected")
+                .show_alert();
+        } else if data.edit_mode {
+            let dialog = MessageDialog::new()
+                .set_type(MessageType::Warning)
+                .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
+                .set_title("Ebook in edit mode")
                 .show_alert();
         } else {
             if data.string_bookmark.len() == 0 {
@@ -432,6 +547,12 @@ impl AppState {
                 .set_type(MessageType::Info)
                 .set_text("Please select an Ebook to enable this function.")
                 .set_title("Ebook not selected")
+                .show_alert();
+        } else if data.edit_mode {
+            let dialog = MessageDialog::new()
+                .set_type(MessageType::Warning)
+                .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
+                .set_title("Ebook in edit mode")
                 .show_alert();
         } else {
             data.string_bookmark = String::new();
@@ -524,8 +645,10 @@ pub fn doit(src_dir: &str, dst_file: &str, method: zip::CompressionMethod) -> zi
 }
 
 
+
 pub const GO_TO_POS: Selector<usize> = Selector::new("go_to_pos");
 pub const DELETE_BOOKMARK: Selector<(String, usize)> = Selector::new("delete_bookmark");
+pub const MODIFY_EDIT_MODE: Selector<bool> = Selector::new("modify_edit_mode");
 
 pub struct Delegate;
 
@@ -538,6 +661,8 @@ impl AppDelegate<AppState> for Delegate {
         data: &mut AppState,
         _env: &Env,
     ) -> Handled {
+
+
         if let Some(file_info) = cmd.get(commands::SAVE_FILE_AS) {
             if Path::new(file_info.path().to_str().unwrap()).exists() {
                 let dialog = MessageDialog::new()
@@ -568,10 +693,7 @@ impl AppDelegate<AppState> for Delegate {
                 let mut already_found = false;
 
                 data.chapters.iter().enumerate().for_each(|(i, x)| {
-
-
-
-                    if found_start_page  {
+                    if found_start_page {
                         stop_page = x.target_page;
                         found_start_page = false;
                     }
@@ -594,18 +716,17 @@ impl AppDelegate<AppState> for Delegate {
 
                 let mut new_content = String::new();
 
-                for i in start_page_chapter..stop_page-1 {
+                for i in start_page_chapter..stop_page - 1 {
                     println!("pagina che scorro {}", i);
 
                     if data.current_page == i {
-
                         new_content.push_str(data.current_page_text.as_str());
-                    }else{
+                    } else {
                         new_content.push_str(data.ebook[i].text.as_str());
                     }
                 }
 
-                println!("New Content {}",new_content);
+                println!("New Content {}", new_content);
 
 
                 let mut file_to_find = "h-".to_string();
@@ -622,7 +743,6 @@ impl AppDelegate<AppState> for Delegate {
                     if (file.name()).ends_with('/') {
                         fs::create_dir_all(&outpath).unwrap();
                     } else {
-
                         if file.name().contains(&file_to_find.clone()) {
                             file_to_find = file.name().to_string();
                         }
@@ -663,12 +783,19 @@ impl AppDelegate<AppState> for Delegate {
                     .set_text(str.as_str())
                     .set_title("Success")
                     .show_alert();
+
                 fs::remove_dir_all(dest_path);
+
+
             }
 
             data.edit_mode = false;
         }
 
+        if cmd.is(MODIFY_EDIT_MODE){
+            let pos = cmd.get_unchecked(MODIFY_EDIT_MODE);
+            data.edit_mode = *pos;
+        }
 
         if cmd.is(GO_TO_POS) {
             let pos = cmd.get_unchecked(GO_TO_POS);
@@ -692,6 +819,15 @@ impl AppDelegate<AppState> for Delegate {
 
 
         if let Some(file_info) = cmd.get(commands::OPEN_FILE) {
+            if data.edit_mode {
+                let dialog = MessageDialog::new()
+                    .set_type(MessageType::Warning)
+                    .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
+                    .set_title("Ebook in edit mode")
+                    .show_alert();
+                return Handled::Yes;
+            }
+
             data.file_info = file_info.clone().path().to_str().unwrap().to_string();
             match EpubArchive::new(file_info.clone().path())
             {
@@ -736,6 +872,7 @@ impl AppDelegate<AppState> for Delegate {
                             if res.is_ok() {
                                 println!("res {}", res.as_ref().unwrap().to_string());
                                 let init = res.as_ref().unwrap().find("<?xml");
+
 
                                 if res.as_ref().unwrap()[init.unwrap()..].contains("START OF THIS PROJECT GUTENBERG EBOOK") {
                                     chapter_title = "START OF THIS PROJECT GUTENBERG EBOOK".to_string();

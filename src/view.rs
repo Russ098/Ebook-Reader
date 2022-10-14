@@ -165,12 +165,17 @@ fn option_row_edit_mode() -> impl Widget<AppState> {
     let save_button = Button::new("Save new version").padding(5.0).on_click(move |ctx, _, _| {
         ctx.submit_command(druid::commands::SHOW_SAVE_PANEL.with(save_dialog_options.clone()));
 
+    });
 
+    let undo_button = Button::new("Undo").padding(5.0).on_click(move |ctx, _, _| {
+        ctx.submit_command(MODIFY_EDIT_MODE.with(false));
+        ctx.submit_command(druid::commands::CLOSE_WINDOW);
     });
 
 
     let r1 = Flex::row()
         .with_child(save_button)
+        .with_child(undo_button)
         .align_left();
 
     Flex::row()
@@ -519,12 +524,14 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
                 c4.add_child(Label::new("\n"));
             }
             c3.add_flex_child(c4, 0.2);
-            let padd = Padding::new((20., 0.), c.cross_axis_alignment(CrossAxisAlignment::Start));
+            let padd = Padding::new((30., 0.), c.cross_axis_alignment(CrossAxisAlignment::Start));
             c3.add_flex_child(padd, 1.0);
         } else {
             c3.add_flex_child(c.cross_axis_alignment(CrossAxisAlignment::Start), 1.0);
         }
-        c3.add_flex_child(c2.cross_axis_alignment(CrossAxisAlignment::Start), 1.0);
+
+        let padd2 = Padding::new((30., 0.), c2.cross_axis_alignment(CrossAxisAlignment::Start));
+        c3.add_flex_child(padd2, 1.0);
         scroll = Scroll::new(c3.cross_axis_alignment(CrossAxisAlignment::Start)).vertical();
     } else {
         let mut c3 = Flex::row();

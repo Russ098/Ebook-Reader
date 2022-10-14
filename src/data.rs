@@ -14,6 +14,7 @@ use druid::widget::{Image, SizedBox};
 use epub::archive::EpubArchive;
 use imagesize::{size, ImageSize, blob_size};
 use druid::piet::ImageFormat;
+use druid::platform_menus::win::file::new;
 use fltk::draw::descent;
 use fltk::enums::Cursor::Default;
 use fltk::window::{SingleWindow, Window};
@@ -243,72 +244,18 @@ impl AppState {
                 .show_alert();
         } else {
             //TODO: Fare la vera funzione
-            let mut f = File::create("\\Ebook_Reader\\test.zip");
-            fs::copy(data.file_info.clone(), Path::new("\\Ebook_Reader\\test.zip"));
 
-            let mut path = PathBuf::from("\\Ebook_Reader\\test.zip");
-            let mut dest_path = Path::new("\\Ebook_Reader\\output\\");
-
-
-            // fs::create_dir(dest_path).unwrap();
-
-            let fname = std::path::Path::new(&path);
-            let file = fs::File::open(&fname).unwrap();
-
-            let mut archive = zip::ZipArchive::new(file).unwrap();
-
-            for i in 0..archive.len() {
-                let mut file = archive.by_index(i).unwrap();
-                let outpath = match file.enclosed_name() {
-                    Some(path) => path.to_owned(),
-                    None => continue,
-                };
-
-                {
-                    let comment = file.comment();
-                    if !comment.is_empty() {
-                        println!("File {} comment: {}", i, comment);
-                    }
-                }
-
-                if (file.name()).ends_with('/') {
-                    println!("File {} extracted to \"{}\" primo create", i, outpath.display());
-                    fs::create_dir_all(&outpath).unwrap();
-                } else {
-                    println!(
-                        "File {} extracted to \"{}\" ({} bytes)",
-                        i,
-                        outpath.display(),
-                        file.size()
-                    );
-                    if let Some(p) = outpath.parent() {
-                        if !p.exists() {
-                            println!("P : {}", p.display());
-                            let mut a = dest_path.to_str().unwrap().to_string();
-                            a.push_str(p.to_str().unwrap());
-                            fs::create_dir_all(a).unwrap();
-                        }
-                    }
-                    let mut a2 = dest_path.to_str().unwrap().to_string();
-                    a2.push_str(outpath.to_str().unwrap());
-                    let mut outfile = fs::File::create(a2).unwrap();
-                    io::copy(&mut file, &mut outfile).unwrap();
-                }
-            }
-
-
-            //let mut zip = ZipWriter::new(file);
-            //zip.add_directory("prova", FileOptions::default());
-            doit(dest_path.to_str().unwrap(), "\\Ebook_Reader\\prova.epub", CompressionMethod::Stored);
 
             data.edit_mode = !data.edit_mode;
 
-            data.current_page_text = data.ebook.get(data.current_page).unwrap().clone().text;
+            data.current_page_text = data.ebook[data.current_page].clone().text;
+            println!("Data current page: {}", data.current_page_text);
 
             let new_win = WindowDesc::new(build_ui_edit_mode)
                 .title("Edit Ebook")
                 .window_size(Size::new(1200., 700.));
             _ctx.new_window(new_win);
+
 
             data.load_from_json();
         }
@@ -527,7 +474,7 @@ impl AppState {
 }
 
 fn zip_dir<T>(it: &mut dyn Iterator<Item=OtherDirEntry>, prefix: &str, writer: T, method: zip::CompressionMethod)
-                  -> zip::result::ZipResult<()>
+              -> zip::result::ZipResult<()>
     where T: Write + Seek
 {
     let mut zip = zip::ZipWriter::new(writer);
@@ -543,7 +490,6 @@ fn zip_dir<T>(it: &mut dyn Iterator<Item=OtherDirEntry>, prefix: &str, writer: T
         // Write file or directory explicitly
         // Some unzip tools unzip files with directory paths correctly, some do not!
         if path.is_file() {
-            println!("adding file {:?} as {:?} ...", path, name);
             zip.start_file_from_path(name, options)?;
             let mut f = File::open(path)?;
 
@@ -553,7 +499,7 @@ fn zip_dir<T>(it: &mut dyn Iterator<Item=OtherDirEntry>, prefix: &str, writer: T
         } else if name.as_os_str().len() != 0 {
             // Only if not root! Avoids path spec / warning
             // and mapname conversion failed error on unzip
-            println!("adding dir {:?} as {:?} ...", path, name);
+
             zip.add_directory_from_path(name, options)?;
         }
     }
@@ -561,7 +507,7 @@ fn zip_dir<T>(it: &mut dyn Iterator<Item=OtherDirEntry>, prefix: &str, writer: T
     Result::Ok(())
 }
 
-fn doit(src_dir: &str, dst_file: &str, method: zip::CompressionMethod) -> zip::result::ZipResult<()> {
+pub fn doit(src_dir: &str, dst_file: &str, method: zip::CompressionMethod) -> zip::result::ZipResult<()> {
     if !Path::new(src_dir).is_dir() {
         return Err(ZipError::FileNotFound);
     }
@@ -592,6 +538,138 @@ impl AppDelegate<AppState> for Delegate {
         data: &mut AppState,
         _env: &Env,
     ) -> Handled {
+        if let Some(file_info) = cmd.get(commands::SAVE_FILE_AS) {
+            if Path::new(file_info.path().to_str().unwrap()).exists() {
+                let dialog = MessageDialog::new()
+                    .set_type(MessageType::Error)
+                    .set_text("There is already an ebook with this name in this folder, try again with another name or change folder.")
+                    .set_title("Ebook already exists")
+                    .show_alert();
+            } else {
+                let mut f = File::create(file_info.path().to_str().unwrap());
+                fs::copy(data.file_info.clone(), Path::new(file_info.path().to_str().unwrap()));
+
+                let mut path = PathBuf::from(file_info.path().to_str().unwrap());
+                let mut dest_path = Path::new("\\Ebook_Reader\\output\\");
+
+
+                // fs::create_dir(dest_path).unwrap();
+
+                let fname = std::path::Path::new(&path);
+                let file = fs::File::open(&fname).unwrap();
+
+                let mut archive = zip::ZipArchive::new(file).unwrap();
+
+                let mut current_chapter = 0;
+                let mut start_page_chapter = 0;
+                let mut last_initial_page = 0;
+                let mut stop_page = 0;
+                let mut found_start_page = false;
+                let mut already_found = false;
+
+                data.chapters.iter().enumerate().for_each(|(i, x)| {
+
+
+
+                    if found_start_page  {
+                        stop_page = x.target_page;
+                        found_start_page = false;
+                    }
+                    if x.target_page > data.current_page && !already_found {
+                        current_chapter = i - 1;
+                        start_page_chapter = last_initial_page;
+                        found_start_page = true;
+                        already_found = true;
+                        println!("Trovato pagina maggiore {}", current_chapter);
+                    } else if x.target_page == data.current_page && !already_found {
+                        current_chapter = i - 1;
+                        start_page_chapter = x.target_page;
+                        found_start_page = true;
+                        already_found = true;
+                        println!("Trovato pagina uguale {}", current_chapter);
+                    }
+
+                    last_initial_page = x.target_page;
+                });
+
+                let mut new_content = String::new();
+
+                for i in start_page_chapter..stop_page-1 {
+                    println!("pagina che scorro {}", i);
+
+                    if data.current_page == i {
+
+                        new_content.push_str(data.current_page_text.as_str());
+                    }else{
+                        new_content.push_str(data.ebook[i].text.as_str());
+                    }
+                }
+
+                println!("New Content {}",new_content);
+
+
+                let mut file_to_find = "h-".to_string();
+                file_to_find.push_str(current_chapter.to_string().as_str());
+                file_to_find.push_str(".htm.html");
+
+                for i in 0..archive.len() {
+                    let mut file = archive.by_index(i).unwrap();
+                    let outpath = match file.enclosed_name() {
+                        Some(path) => path.to_owned(),
+                        None => continue,
+                    };
+
+                    if (file.name()).ends_with('/') {
+                        fs::create_dir_all(&outpath).unwrap();
+                    } else {
+
+                        if file.name().contains(&file_to_find.clone()) {
+                            file_to_find = file.name().to_string();
+                        }
+
+
+                        if let Some(p) = outpath.parent() {
+                            if !p.exists() {
+                                let mut a = dest_path.to_str().unwrap().to_string();
+                                a.push_str(p.to_str().unwrap());
+                                fs::create_dir_all(a).unwrap();
+                            }
+                        }
+                        let mut a2 = dest_path.to_str().unwrap().to_string();
+                        a2.push_str(outpath.to_str().unwrap());
+                        let mut outfile = fs::File::create(a2).unwrap();
+                        io::copy(&mut file, &mut outfile).unwrap();
+                    }
+                }
+
+                let mut file_to_edit = dest_path.to_str().unwrap().to_string();
+                file_to_edit.push_str(file_to_find.as_str());
+                File::create(file_to_edit.clone());
+
+                let mut f2 = std::fs::OpenOptions::new().write(true).truncate(true).open(file_to_edit).unwrap();
+                f2.write_all(new_content.as_bytes()).unwrap();
+                f2.flush().unwrap();
+
+                //let mut zip = ZipWriter::new(file);
+                //zip.add_directory("prova", FileOptions::default());
+
+
+                doit(dest_path.to_str().unwrap(), file_info.path().to_str().unwrap(), CompressionMethod::Bzip2);
+                let mut str = "File correctly saved at: ".to_string();
+                str.push_str(file_info.path().to_str().unwrap());
+
+                let dialog = MessageDialog::new()
+                    .set_type(MessageType::Info)
+                    .set_text(str.as_str())
+                    .set_title("Success")
+                    .show_alert();
+                fs::remove_dir_all(dest_path);
+            }
+
+            data.edit_mode = false;
+        }
+
+
         if cmd.is(GO_TO_POS) {
             let pos = cmd.get_unchecked(GO_TO_POS);
             data.current_page = *pos;
@@ -637,20 +715,27 @@ impl AppDelegate<AppState> for Delegate {
 
                     data.load_from_json();
 
-                    let mut page_no = 0;
+                    let mut page_no = 1;
                     let mut page_not_ended = false;
                     let mut chapter_title: String = String::new();
-                    let mut chapter_number: usize = 1;
+                    let mut past_page_no = 0;
 
                     for f in archive.files.clone() {
-                        if f.contains("OEBPS") && f.contains("htm.html") {
-                            data.ebook.push_back(Page::new());
+                        data.ebook.push_back(Page::new());
 
+                        if f.contains("OEBPS") && (f.contains("htm.html") || f.contains("wrap")) {
+                            if f.contains("wrap") {
+                                past_page_no = page_no;
+                                page_no = 0;
+                            } else {
+                                data.ebook.push_back(Page::new());
+                            }
 
                             let res = archive.get_entry_as_str(f.clone());
 
                             if res.is_ok() {
-                                let init = res.as_ref().unwrap().find("<body");
+                                println!("res {}", res.as_ref().unwrap().to_string());
+                                let init = res.as_ref().unwrap().find("<?xml");
 
                                 if res.as_ref().unwrap()[init.unwrap()..].contains("START OF THIS PROJECT GUTENBERG EBOOK") {
                                     chapter_title = "START OF THIS PROJECT GUTENBERG EBOOK".to_string();
@@ -952,6 +1037,9 @@ impl AppDelegate<AppState> for Delegate {
 
                                     page_no += 1;
                                 }
+                            }
+                            if f.contains("wrap") {
+                                page_no = past_page_no;
                             }
                         }
                     }

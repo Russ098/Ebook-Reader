@@ -127,16 +127,8 @@ pub fn build_ui_edit_mode() -> impl Widget<AppState> {
 
     c.add_child(option_row_edit_mode());
 
-    c.add_flex_child(TextBox::multiline().lens(AppState::current_page_text).expand_width(),1.);
 
-
-    /*
-    c.add_child(option_edit_row());
-    c.add_child(bookmark_row());
-    c.add_flex_child(Rebuilder::new(), 1.0);
-    c.add_child(settings_row());
-
-    */
+    c.add_flex_child(Scroll::new(TextBox::multiline().lens(AppState::current_page_text).expand_width()).vertical(),1.);
 
     return c;
 }
@@ -223,7 +215,68 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
         }
 
 
+
         let init = state.ebook[state.current_page].text.find("<body");
+        let end_body = state.ebook[state.current_page].text.find("</html>");
+
+        if end_body.is_some(){
+            if end_body.unwrap() < init.unwrap() {
+                for element in state.ebook[state.current_page].text[..end_body.unwrap()].split("\n") {
+                    if element.contains("img") {
+                        for pixel in state.ebook[state.current_page].images[i].image.clone() {
+                            pixels_vec.push(pixel);
+                        }
+                        match pixels_vec.len() / (state.ebook[state.current_page].images[i].width * state.ebook[state.current_page].images[i].height) {
+                            1 => {
+                                image_buf = ImageBuf::from_raw(pixels_vec.clone(), ImageFormat::Grayscale, state.ebook[state.current_page]
+                                    .images[i].width, state.ebook[state.current_page].images[i].height);
+                            }
+                            3 => {
+                                image_buf = ImageBuf::from_raw(pixels_vec.clone(), ImageFormat::Rgb, state.ebook[state.current_page]
+                                    .images[i].width, state.ebook[state.current_page].images[i].height);
+                            }
+                            4 => {
+                                image_buf = ImageBuf::from_raw(pixels_vec.clone(), ImageFormat::RgbaPremul, state.ebook[state.current_page]
+                                    .images[i].width, state.ebook[state.current_page].images[i].height);
+                            }
+                            _ => { panic!("Unable to process the image") }
+                        }
+
+
+                        let mut img = Image::new(image_buf.clone()).fill_mode(FillStrat::Fill);
+
+
+                        let mut sized = SizedBox::new(img).fix_size(image_buf.width().clone() as f64 * (state.font_size.clone().parse::<f64>().unwrap() / 40.),
+                                                                    image_buf.height().clone() as f64 * (state.font_size.clone().parse::<f64>().unwrap() / 40.));
+
+                        let container = sized.border(Color::grey(0.6), 2.0).center().boxed();
+
+                        c.add_child(container);
+                        i += 1;
+                        pixels_vec.clear();
+                    } else {
+                        let mut _string;
+
+                        let mut appStr = element.to_string();
+
+                        if appStr.len() >= 1 {
+                            if appStr.chars().last().unwrap() == '<' {
+                                appStr.replace_range(appStr.len() - 1.., "");
+                            }
+                        }
+
+                        _string = strip_tags(appStr.as_str());
+
+
+                        let rl = Label::new(_string.clone())
+                            .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
+                            .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size);
+
+                        c.add_child(rl);
+                    }
+                }
+            }
+        }
 
         if init.is_some(){
             for element in state.ebook[state.current_page].text[init.unwrap()..].split("\n") {
@@ -281,6 +334,8 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
                 }
             }
         }else{
+            println!("Dentro else is_some");
+            //mi trovo in mezzo a piu pagine
             for element in state.ebook[state.current_page].text.split("\n") {
                 if element.contains("img") {
                     for pixel in state.ebook[state.current_page].images[i].image.clone() {

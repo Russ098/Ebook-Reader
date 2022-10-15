@@ -259,7 +259,6 @@ impl AppState {
             data.edit_mode = !data.edit_mode;
 
             data.current_page_text = data.ebook[data.current_page].clone().text;
-            println!("Data current page: {}", data.current_page_text);
 
 
 
@@ -712,13 +711,11 @@ impl AppDelegate<AppState> for Delegate {
                         start_page_chapter = last_initial_page;
                         found_start_page = true;
                         already_found = true;
-                        println!("Trovato pagina maggiore {}", current_chapter);
                     } else if x.target_page == data.current_page && !already_found {
-                        current_chapter = i - 1;
+                        current_chapter = i;
                         start_page_chapter = x.target_page;
                         found_start_page = true;
                         already_found = true;
-                        println!("Trovato pagina uguale {}", current_chapter);
                     }
 
                     last_initial_page = x.target_page;
@@ -727,13 +724,16 @@ impl AppDelegate<AppState> for Delegate {
                 let mut new_content = String::new();
 
                 for i in start_page_chapter..stop_page - 1 {
-                    println!("pagina che scorro {}", i);
 
                     if data.current_page == i {
                         new_content.push_str(data.current_page_text.as_str());
                     } else {
                         new_content.push_str(data.ebook[i].text.as_str());
                     }
+                }
+
+                if start_page_chapter == (stop_page - 1) {
+                    new_content.push_str(data.current_page_text.as_str());
                 }
 
                 println!("New Content {}", new_content);
@@ -798,8 +798,6 @@ impl AppDelegate<AppState> for Delegate {
 
 
             }
-
-            data.edit_mode = false;
         }
 
         if cmd.is(MODIFY_EDIT_MODE){
@@ -866,7 +864,11 @@ impl AppDelegate<AppState> for Delegate {
                     let mut chapter_title: String = String::new();
                     let mut past_page_no = 0;
 
+
+                    alphanumeric_sort::sort_path_slice(&mut archive.files);
+
                     for f in archive.files.clone() {
+                        println!("Prelevo file {}", f);
                         data.ebook.push_back(Page::new());
 
                         if f.contains("OEBPS") && (f.contains("htm.html") || f.contains("wrap")) {
@@ -880,7 +882,7 @@ impl AppDelegate<AppState> for Delegate {
                             let res = archive.get_entry_as_str(f.clone());
 
                             if res.is_ok() {
-                                println!("res {}", res.as_ref().unwrap().to_string());
+
                                 let init = res.as_ref().unwrap().find("<?xml");
 
 
@@ -911,6 +913,7 @@ impl AppDelegate<AppState> for Delegate {
 
                                 if page_occ > 0 {
                                     let mut pos_pageno = res.as_ref().unwrap()[init.unwrap()..].find("<span class=\"x-ebookmaker-pageno\"").unwrap();
+                                    pos_pageno += res.as_ref().unwrap()[init.unwrap() + pos_pageno..].find("</span>").unwrap() + 6;
                                     let mut text = res.as_ref().unwrap()[init.unwrap()..]._substr(0, pos_pageno);
                                     let mut img_occ = text.matches("<img").count();
                                     let mut pos = text.find("<img");
@@ -982,13 +985,12 @@ impl AppDelegate<AppState> for Delegate {
                                         page_not_ended = false;
                                     }
 
-
-                                    pos_pageno += res.as_ref().unwrap()[init.unwrap() + pos_pageno..].find("</span>").unwrap() + 7;
-
+                                    pos_pageno += 1;
 
                                     for i in 1..page_occ {
                                         let next_page = res.as_ref().unwrap()[init.unwrap() + pos_pageno..].find("<span class=\"x-ebookmaker-pageno\"");
-                                        text = res.as_ref().unwrap()[init.unwrap() + pos_pageno..]._substr(0, next_page.unwrap());
+                                        let offset = res.as_ref().unwrap()[init.unwrap() + next_page.unwrap() + pos_pageno..].find("</span>").unwrap();
+                                        text = res.as_ref().unwrap()[init.unwrap() + pos_pageno..]._substr(0, (next_page.unwrap()+offset-5));
                                         img_occ = text.matches("<img").count();
                                         pos = text.find("<img");
                                         if img_occ > 0 {
@@ -1048,8 +1050,8 @@ impl AppDelegate<AppState> for Delegate {
 
                                         data.ebook[page_no].text.push_str(text.as_str());
 
-                                        pos_pageno += next_page.unwrap() + 34;
-                                        pos_pageno += res.as_ref().unwrap()[init.unwrap() + pos_pageno..].find("</span>").unwrap() + 7;
+                                        //pos_pageno += next_page.unwrap()+34;
+                                        pos_pageno += next_page.unwrap() + offset +7;
                                         data.ebook.push_back(Page::new());
                                         page_no += 1;
                                     }

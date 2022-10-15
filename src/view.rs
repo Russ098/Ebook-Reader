@@ -9,7 +9,6 @@ use druid::piet::ImageFormat;
 use druid::text::RichText;
 use crate::data::*;
 use druid::widget::{TextBox, Button, RawLabel, Scroll, SizedBox, LensWrap, Image, FillStrat, Label, CrossAxisAlignment, LineBreaking, Padding, Click, ControllerHost};
-use fltk::app::App;
 use image::ImageFormat::Ico;
 use imagesize::size;
 use voca_rs::strip::strip_tags;

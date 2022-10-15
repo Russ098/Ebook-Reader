@@ -17,9 +17,6 @@ use epub::archive::EpubArchive;
 use imagesize::{size, ImageSize, blob_size};
 use druid::piet::ImageFormat;
 use druid::platform_menus::win::file::new;
-use fltk::draw::descent;
-use fltk::enums::Cursor::Default;
-use fltk::window::{SingleWindow, Window};
 use image::imageops::resize;
 use native_dialog::{MessageDialog, MessageType};
 use voca_rs::Voca;
@@ -653,6 +650,19 @@ pub const MODIFY_EDIT_MODE: Selector<bool> = Selector::new("modify_edit_mode");
 pub struct Delegate;
 
 impl AppDelegate<AppState> for Delegate {
+
+    fn window_removed(
+        &mut self,
+        id: WindowId,
+        data: &mut AppState,
+        env: &Env,
+        ctx: &mut DelegateCtx<'_>
+    ) {
+
+        data.edit_mode = !data.edit_mode;
+    }
+
+
     fn command(
         &mut self,
         _ctx: &mut DelegateCtx,

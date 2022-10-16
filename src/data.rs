@@ -856,6 +856,7 @@ impl AppDelegate<AppState> for Delegate {
                     data.display_menu = false;
                     data.edit_mode = false;
                     data.new_bookmark = false;
+                    data.chapters.clear();
 
                     data.load_from_json();
 
@@ -868,10 +869,10 @@ impl AppDelegate<AppState> for Delegate {
                     alphanumeric_sort::sort_path_slice(&mut archive.files);
 
                     for f in archive.files.clone() {
-                        println!("Prelevo file {}", f);
-                        data.ebook.push_back(Page::new());
+
 
                         if f.contains("OEBPS") && (f.contains("htm.html") || f.contains("wrap")) {
+                            data.ebook.push_back(Page::new());
                             if f.contains("wrap") {
                                 past_page_no = page_no;
                                 page_no = 0;
@@ -885,8 +886,10 @@ impl AppDelegate<AppState> for Delegate {
 
                                 let init = res.as_ref().unwrap().find("<?xml");
 
-
-                                if res.as_ref().unwrap()[init.unwrap()..].contains("START OF THIS PROJECT GUTENBERG EBOOK") {
+                                if res.as_ref().unwrap()[init.unwrap()..].contains("class=\"x-ebookmaker-cover\""){
+                                    chapter_title = "COVER".to_string();
+                                }
+                                else if res.as_ref().unwrap()[init.unwrap()..].contains("START OF THIS PROJECT GUTENBERG EBOOK") {
                                     chapter_title = "START OF THIS PROJECT GUTENBERG EBOOK".to_string();
                                 } else if res.as_ref().unwrap()[init.unwrap()..].contains("END OF THIS PROJECT GUTENBERG EBOOK") {
                                     chapter_title = "END OF THIS PROJECT GUTENBERG EBOOK".to_string();
@@ -900,13 +903,19 @@ impl AppDelegate<AppState> for Delegate {
                                     chapter_title = "PREFACE".to_string();
                                 } else if res.as_ref().unwrap()[init.unwrap()..].contains("ILLUSTRATIONS") {
                                     chapter_title = "ILLUSTRATIONS".to_string();
-                                } else if res.as_ref().unwrap().find("<div class=\"chapter\"").is_none() {
+                                }else if res.as_ref().unwrap().find("<div class=\"chapter\"").is_none()  {
                                     chapter_title = "POSTFACE".to_string();
-                                } else {
+                                }  else {
                                     chapter_title = strip_tags(&res.as_ref().unwrap()[res.as_ref().unwrap().find("<div class=\"chapter\"").unwrap()..res.as_ref().unwrap().find("</div>").unwrap()])
                                         .replace("\n", " ").trim_start().trim_end().to_string();
                                 }
-                                data.chapters.push_back(Chapter::from(chapter_title, page_no));
+
+                                if chapter_title.eq("COVER"){
+                                    data.chapters.push_front(Chapter::from(chapter_title, page_no));
+                                }else {
+                                    data.chapters.push_back(Chapter::from(chapter_title, page_no));
+                                }
+
 
 
                                 let page_occ = res.as_ref().unwrap()[init.unwrap()..].matches("<span class=\"x-ebookmaker-pageno\"").count();
@@ -988,11 +997,12 @@ impl AppDelegate<AppState> for Delegate {
                                     pos_pageno += 1;
 
                                     for i in 1..page_occ {
-                                        let next_page = res.as_ref().unwrap()[init.unwrap() + pos_pageno..].find("<span class=\"x-ebookmaker-pageno\"");
-                                        let offset = res.as_ref().unwrap()[init.unwrap() + next_page.unwrap() + pos_pageno..].find("</span>").unwrap();
-                                        text = res.as_ref().unwrap()[init.unwrap() + pos_pageno..]._substr(0, (next_page.unwrap()+offset-5));
-                                        img_occ = text.matches("<img").count();
-                                        pos = text.find("<img");
+
+                                        let mut next_page = res.as_ref().unwrap()[init.unwrap() + pos_pageno..].find("<span class=\"x-ebookmaker-pageno\"").unwrap();
+                                        next_page += res.as_ref().unwrap()[init.unwrap() + pos_pageno + next_page..].find("</span>").unwrap() + 6;
+                                        let mut text = res.as_ref().unwrap()[init.unwrap() + pos_pageno..init.unwrap() + pos_pageno + next_page + 1].to_string().clone();
+                                        let mut img_occ = text.matches("<img").count();
+                                        let mut pos = text.find("<img");
                                         if img_occ > 0 {
                                             if pos.is_some() {
                                                 let mut displacement: usize = 0;
@@ -1040,7 +1050,11 @@ impl AppDelegate<AppState> for Delegate {
                                                         panic!("Formato non supportato");
                                                     }
                                                     let result = r.into_bytes();
-                                                    data.ebook[page_no].images.push_back(ImageOfPage::from(Vector::from(result), width, height));
+                                                    if page_not_ended {
+                                                        data.ebook[page_no - 1].images.push_back(ImageOfPage::from(Vector::from(result), width, height));
+                                                    } else {
+                                                        data.ebook[page_no].images.push_back(ImageOfPage::from(Vector::from(result), width, height));
+                                                    }
                                                     let resapp = text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].find("<img");
                                                     displacement = pos.unwrap() + 3 + app.unwrap() + 5 + displacement;
                                                     pos = resapp;
@@ -1049,11 +1063,10 @@ impl AppDelegate<AppState> for Delegate {
                                         }
 
                                         data.ebook[page_no].text.push_str(text.as_str());
-
-                                        //pos_pageno += next_page.unwrap()+34;
-                                        pos_pageno += next_page.unwrap() + offset +7;
                                         data.ebook.push_back(Page::new());
                                         page_no += 1;
+                                        pos_pageno += next_page+1;
+
                                     }
 
                                     page_not_ended = true;

@@ -219,7 +219,7 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
         let init = state.ebook[state.current_page].text.find("<body");
         let end_body = state.ebook[state.current_page].text.find("</html>");
 
-        if end_body.is_some(){
+        if end_body.is_some() && init.is_some(){
             if end_body.unwrap() < init.unwrap() {
                 for element in state.ebook[state.current_page].text[..end_body.unwrap()].split("\n") {
                     if element.contains("img") {

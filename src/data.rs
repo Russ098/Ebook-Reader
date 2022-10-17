@@ -261,66 +261,59 @@ impl AppState {
             data.current_page_text = data.ebook[data.current_page].clone().text;
 
 
-
-
-
             let new_win = WindowDesc::new(build_ui_edit_mode)
                 .title("Edit Ebook")
                 .window_size(Size::new(1200., 700.));
 
 
+            /*            let event_loop = EventLoop::new();
+                        let window = WindowBuilder::new().build(&event_loop).unwrap();
 
 
-/*            let event_loop = EventLoop::new();
-            let window = WindowBuilder::new().build(&event_loop).unwrap();
+                        event_loop.run(move |event, _, control_flow| {
+                            // ControlFlow::Poll continuously runs the event loop, even if the OS hasn't
+                            // dispatched any events. This is ideal for games and similar applications.
+                            control_flow.set_poll();
 
+                            // ControlFlow::Wait pauses the event loop if no events are available to process.
+                            // This is ideal for non-game applications that only update in response to user
+                            // input, and uses significantly less power/CPU time than ControlFlow::Poll.
+                            control_flow.set_wait();
 
-            event_loop.run(move |event, _, control_flow| {
-                // ControlFlow::Poll continuously runs the event loop, even if the OS hasn't
-                // dispatched any events. This is ideal for games and similar applications.
-                control_flow.set_poll();
+                            match event {
+                                Other_Event::WindowEvent {
+                                    event: WindowEvent::CloseRequested,
+                                    ..
+                                } => {
+                                    println!("The close button was pressed; stopping");
+                                    //_ctx.submit_command(commands::CLOSE_WINDOW.to(new_win.id));
+                                },
+                                Other_Event::MainEventsCleared => {
+                                    // Application update code.
 
-                // ControlFlow::Wait pauses the event loop if no events are available to process.
-                // This is ideal for non-game applications that only update in response to user
-                // input, and uses significantly less power/CPU time than ControlFlow::Poll.
-                control_flow.set_wait();
+                                    // Queue a RedrawRequested event.
+                                    //
+                                    // You only need to call this if you've determined that you need to redraw, in
+                                    // applications which do not always need to. Applications that redraw continuously
+                                    // can just render here instead.
+                                    window.request_redraw();
+                                },
+                                Other_Event::RedrawRequested(_) => {
+                                    // Redraw the application.
+                                    //
+                                    // It's preferable for applications that do not render continuously to render in
+                                    // this event rather than in MainEventsCleared, since rendering in here allows
+                                    // the program to gracefully handle redraws requested by the OS.
+                                },
+                                _ => ()
+                            }
+                        });
 
-                match event {
-                    Other_Event::WindowEvent {
-                        event: WindowEvent::CloseRequested,
-                        ..
-                    } => {
-                        println!("The close button was pressed; stopping");
-                        //_ctx.submit_command(commands::CLOSE_WINDOW.to(new_win.id));
-                    },
-                    Other_Event::MainEventsCleared => {
-                        // Application update code.
-
-                        // Queue a RedrawRequested event.
-                        //
-                        // You only need to call this if you've determined that you need to redraw, in
-                        // applications which do not always need to. Applications that redraw continuously
-                        // can just render here instead.
-                        window.request_redraw();
-                    },
-                    Other_Event::RedrawRequested(_) => {
-                        // Redraw the application.
-                        //
-                        // It's preferable for applications that do not render continuously to render in
-                        // this event rather than in MainEventsCleared, since rendering in here allows
-                        // the program to gracefully handle redraws requested by the OS.
-                    },
-                    _ => ()
-                }
-            });
-
-            */
+                        */
 
             _ctx.new_window(new_win);
 
             data.load_from_json();
-
-
         }
     }
 
@@ -641,7 +634,6 @@ pub fn doit(src_dir: &str, dst_file: &str, method: zip::CompressionMethod) -> zi
 }
 
 
-
 pub const GO_TO_POS: Selector<usize> = Selector::new("go_to_pos");
 pub const DELETE_BOOKMARK: Selector<(String, usize)> = Selector::new("delete_bookmark");
 pub const MODIFY_EDIT_MODE: Selector<bool> = Selector::new("modify_edit_mode");
@@ -649,15 +641,13 @@ pub const MODIFY_EDIT_MODE: Selector<bool> = Selector::new("modify_edit_mode");
 pub struct Delegate;
 
 impl AppDelegate<AppState> for Delegate {
-
     fn window_removed(
         &mut self,
         id: WindowId,
         data: &mut AppState,
         env: &Env,
-        ctx: &mut DelegateCtx<'_>
+        ctx: &mut DelegateCtx<'_>,
     ) {
-
         data.edit_mode = !data.edit_mode;
     }
 
@@ -670,8 +660,6 @@ impl AppDelegate<AppState> for Delegate {
         data: &mut AppState,
         _env: &Env,
     ) -> Handled {
-
-
         if let Some(file_info) = cmd.get(commands::SAVE_FILE_AS) {
             if Path::new(file_info.path().to_str().unwrap()).exists() {
                 let dialog = MessageDialog::new()
@@ -684,10 +672,12 @@ impl AppDelegate<AppState> for Delegate {
                 fs::copy(data.file_info.clone(), Path::new(file_info.path().to_str().unwrap()));
 
                 let mut path = PathBuf::from(file_info.path().to_str().unwrap());
-                let mut dest_path = Path::new("\\Ebook_Reader\\output\\");
+                let mut dest_path = Path::new("/Ebook_Reader/output/");
 
 
-                // fs::create_dir(dest_path).unwrap();
+                fs::create_dir(dest_path).unwrap();
+                fs::create_dir(Path::new("/Ebook_Reader/output/META-INF")).unwrap();
+                fs::create_dir(Path::new("/Ebook_Reader/output/OEBPS")).unwrap();
 
                 let fname = std::path::Path::new(&path);
                 let file = fs::File::open(&fname).unwrap();
@@ -702,20 +692,33 @@ impl AppDelegate<AppState> for Delegate {
                 let mut already_found = false;
 
                 data.chapters.iter().enumerate().for_each(|(i, x)| {
-                    if found_start_page {
+                    println!("I : {} current page {} target page {}", i, data.current_page, x.target_page);
+                    if found_start_page && stop_page == 0{
                         stop_page = x.target_page;
+                        println!("stop page: {}", stop_page);
                         found_start_page = false;
                     }
                     if x.target_page > data.current_page && !already_found {
-                        current_chapter = i - 1;
+                        println!("Dentro maggiore");
+                        current_chapter = i - 2;
                         start_page_chapter = last_initial_page;
+                        stop_page = x.target_page;
                         found_start_page = true;
                         already_found = true;
+
+                        if !data.ebook[start_page_chapter].text.contains("<?xml") {
+                            start_page_chapter -= 1;
+                        }
                     } else if x.target_page == data.current_page && !already_found {
-                        current_chapter = i;
+                        println!("Dentro uguale");
+                        current_chapter = i - 1;
                         start_page_chapter = x.target_page;
                         found_start_page = true;
                         already_found = true;
+
+                        if !data.ebook[start_page_chapter].text.contains("<?xml") {
+                            start_page_chapter -= 1;
+                        }
                     }
 
                     last_initial_page = x.target_page;
@@ -723,20 +726,35 @@ impl AppDelegate<AppState> for Delegate {
 
                 let mut new_content = String::new();
 
-                for i in start_page_chapter..stop_page - 1 {
-
-                    if data.current_page == i {
-                        new_content.push_str(data.current_page_text.as_str());
-                    } else {
-                        new_content.push_str(data.ebook[i].text.as_str());
-                    }
-                }
 
                 if start_page_chapter == (stop_page - 1) {
                     new_content.push_str(data.current_page_text.as_str());
+                } else {
+                    for i in start_page_chapter..stop_page {
+                        if data.current_page == i {
+                            if i == start_page_chapter {
+                                new_content.push_str(&data.current_page_text[data.current_page_text.find("<?xml").unwrap()..]);
+                            } else if i == stop_page - 1 {
+                                new_content.push_str(&data.current_page_text[..data.current_page_text.find("</html>").unwrap() + 7]);
+                            } else {
+                                new_content.push_str(data.current_page_text.as_str());
+                            }
+                        } else {
+                            if i == start_page_chapter {
+                                new_content.push_str(&data.ebook[i].text[data.ebook[i].text.find("<?xml").unwrap()..]);
+                            } else if i == stop_page - 1 {
+                                new_content.push_str(&data.ebook[i].text[..data.ebook[i].text.find("</html>").unwrap() + 7]);
+                            } else {
+                                new_content.push_str(data.ebook[i].text.as_str());
+                            }
+                        }
+                    }
                 }
 
+
                 println!("New Content {}", new_content);
+
+                //new_content = new_content[..new_content.find("</html").unwrap()+7].to_string();
 
 
                 let mut file_to_find = "h-".to_string();
@@ -746,9 +764,10 @@ impl AppDelegate<AppState> for Delegate {
                 for i in 0..archive.len() {
                     let mut file = archive.by_index(i).unwrap();
                     let outpath = match file.enclosed_name() {
-                        Some(path) => path.to_owned(),
+                        Some(path) => { path.to_owned() }
                         None => continue,
                     };
+
 
                     if (file.name()).ends_with('/') {
                         fs::create_dir_all(&outpath).unwrap();
@@ -795,12 +814,10 @@ impl AppDelegate<AppState> for Delegate {
                     .show_alert();
 
                 fs::remove_dir_all(dest_path);
-
-
             }
         }
 
-        if cmd.is(MODIFY_EDIT_MODE){
+        if cmd.is(MODIFY_EDIT_MODE) {
             let pos = cmd.get_unchecked(MODIFY_EDIT_MODE);
             data.edit_mode = *pos;
         }
@@ -869,8 +886,6 @@ impl AppDelegate<AppState> for Delegate {
                     alphanumeric_sort::sort_path_slice(&mut archive.files);
 
                     for f in archive.files.clone() {
-
-
                         if f.contains("OEBPS") && (f.contains("htm.html") || f.contains("wrap")) {
                             data.ebook.push_back(Page::new());
                             if f.contains("wrap") {
@@ -883,13 +898,11 @@ impl AppDelegate<AppState> for Delegate {
                             let res = archive.get_entry_as_str(f.clone());
 
                             if res.is_ok() {
-
                                 let init = res.as_ref().unwrap().find("<?xml");
 
-                                if res.as_ref().unwrap()[init.unwrap()..].contains("class=\"x-ebookmaker-cover\""){
+                                if res.as_ref().unwrap()[init.unwrap()..].contains("class=\"x-ebookmaker-cover\"") {
                                     chapter_title = "COVER".to_string();
-                                }
-                                else if res.as_ref().unwrap()[init.unwrap()..].contains("START OF THIS PROJECT GUTENBERG EBOOK") {
+                                } else if res.as_ref().unwrap()[init.unwrap()..].contains("START OF THIS PROJECT GUTENBERG EBOOK") {
                                     chapter_title = "START OF THIS PROJECT GUTENBERG EBOOK".to_string();
                                 } else if res.as_ref().unwrap()[init.unwrap()..].contains("END OF THIS PROJECT GUTENBERG EBOOK") {
                                     chapter_title = "END OF THIS PROJECT GUTENBERG EBOOK".to_string();
@@ -903,19 +916,18 @@ impl AppDelegate<AppState> for Delegate {
                                     chapter_title = "PREFACE".to_string();
                                 } else if res.as_ref().unwrap()[init.unwrap()..].contains("ILLUSTRATIONS") {
                                     chapter_title = "ILLUSTRATIONS".to_string();
-                                }else if res.as_ref().unwrap().find("<div class=\"chapter\"").is_none()  {
+                                } else if res.as_ref().unwrap().find("<div class=\"chapter\"").is_none() {
                                     chapter_title = "POSTFACE".to_string();
-                                }  else {
+                                } else {
                                     chapter_title = strip_tags(&res.as_ref().unwrap()[res.as_ref().unwrap().find("<div class=\"chapter\"").unwrap()..res.as_ref().unwrap().find("</div>").unwrap()])
                                         .replace("\n", " ").trim_start().trim_end().to_string();
                                 }
 
-                                if chapter_title.eq("COVER"){
+                                if chapter_title.eq("COVER") {
                                     data.chapters.push_front(Chapter::from(chapter_title, page_no));
-                                }else {
+                                } else {
                                     data.chapters.push_back(Chapter::from(chapter_title, page_no));
                                 }
-
 
 
                                 let page_occ = res.as_ref().unwrap()[init.unwrap()..].matches("<span class=\"x-ebookmaker-pageno\"").count();
@@ -997,7 +1009,6 @@ impl AppDelegate<AppState> for Delegate {
                                     pos_pageno += 1;
 
                                     for i in 1..page_occ {
-
                                         let mut next_page = res.as_ref().unwrap()[init.unwrap() + pos_pageno..].find("<span class=\"x-ebookmaker-pageno\"").unwrap();
                                         next_page += res.as_ref().unwrap()[init.unwrap() + pos_pageno + next_page..].find("</span>").unwrap() + 6;
                                         let mut text = res.as_ref().unwrap()[init.unwrap() + pos_pageno..init.unwrap() + pos_pageno + next_page + 1].to_string().clone();
@@ -1065,8 +1076,7 @@ impl AppDelegate<AppState> for Delegate {
                                         data.ebook[page_no].text.push_str(text.as_str());
                                         data.ebook.push_back(Page::new());
                                         page_no += 1;
-                                        pos_pageno += next_page+1;
-
+                                        pos_pageno += next_page + 1;
                                     }
 
                                     page_not_ended = true;

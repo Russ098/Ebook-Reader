@@ -690,9 +690,16 @@ impl AppDelegate<AppState> for Delegate {
                 let mut stop_page = 0;
                 let mut found_start_page = false;
                 let mut already_found = false;
+                let mut i_found = 0;
+                let mut next_stop_page= 0;
 
                 data.chapters.iter().enumerate().for_each(|(i, x)| {
                     println!("I : {} current page {} target page {}", i, data.current_page, x.target_page);
+
+                    if i == i_found {
+                        next_stop_page = x.target_page;
+                    }
+
                     if found_start_page && stop_page == 0{
                         stop_page = x.target_page;
                         println!("stop page: {}", stop_page);
@@ -705,6 +712,7 @@ impl AppDelegate<AppState> for Delegate {
                         stop_page = x.target_page;
                         found_start_page = true;
                         already_found = true;
+                        i_found = i+1;
 
                         if !data.ebook[start_page_chapter].text.contains("<?xml") {
                             start_page_chapter -= 1;
@@ -715,6 +723,7 @@ impl AppDelegate<AppState> for Delegate {
                         start_page_chapter = x.target_page;
                         found_start_page = true;
                         already_found = true;
+                        i_found = i+1;
 
                         if !data.ebook[start_page_chapter].text.contains("<?xml") {
                             start_page_chapter -= 1;
@@ -725,9 +734,11 @@ impl AppDelegate<AppState> for Delegate {
                 });
 
                 let mut new_content = String::new();
-
+                let mut next_content = String::new();
+                let mut one_page = false;
 
                 if start_page_chapter == (stop_page - 1) {
+                    one_page = true;
                     new_content.push_str(data.current_page_text.as_str());
                 } else {
                     for i in start_page_chapter..stop_page {
@@ -736,6 +747,18 @@ impl AppDelegate<AppState> for Delegate {
                                 new_content.push_str(&data.current_page_text[data.current_page_text.find("<?xml").unwrap()..]);
                             } else if i == stop_page - 1 {
                                 new_content.push_str(&data.current_page_text[..data.current_page_text.find("</html>").unwrap() + 7]);
+                                for j in i..next_stop_page {
+
+
+                                    if j == i {
+                                        next_content.push_str(&data.current_page_text[data.current_page_text.find("<?xml").unwrap()..]);
+                                    } else if j == next_stop_page - 1 {
+                                        next_content.push_str(&data.ebook[j].text[..data.ebook[j].text.find("</html>").unwrap() + 7]);
+                                    } else {
+                                        next_content.push_str(data.ebook[j].text.as_str());
+                                    }
+
+                                }
                             } else {
                                 new_content.push_str(data.current_page_text.as_str());
                             }
@@ -756,10 +779,13 @@ impl AppDelegate<AppState> for Delegate {
 
                 //new_content = new_content[..new_content.find("</html").unwrap()+7].to_string();
 
-
                 let mut file_to_find = "h-".to_string();
                 file_to_find.push_str(current_chapter.to_string().as_str());
                 file_to_find.push_str(".htm.html");
+
+                let mut file_to_find_next = "h-".to_string();
+                file_to_find_next.push_str((current_chapter + 1).to_string().as_str());
+                file_to_find_next.push_str(".htm.html");
 
                 for i in 0..archive.len() {
                     let mut file = archive.by_index(i).unwrap();
@@ -774,6 +800,10 @@ impl AppDelegate<AppState> for Delegate {
                     } else {
                         if file.name().contains(&file_to_find.clone()) {
                             file_to_find = file.name().to_string();
+                        }
+
+                        if file.name().contains(&file_to_find_next.clone()){
+                            file_to_find_next = file.name().to_string();
                         }
 
 
@@ -791,6 +821,18 @@ impl AppDelegate<AppState> for Delegate {
                     }
                 }
 
+                if data.current_page == stop_page - 1 && !one_page{
+
+                    let mut file_to_edit = dest_path.to_str().unwrap().to_string();
+                    file_to_edit.push_str(file_to_find_next.as_str());
+                    File::create(file_to_edit.clone());
+
+                    let mut f2 = std::fs::OpenOptions::new().write(true).truncate(true).open(file_to_edit).unwrap();
+                    f2.write_all(next_content.as_bytes()).unwrap();
+                    f2.flush().unwrap();
+
+                }
+
                 let mut file_to_edit = dest_path.to_str().unwrap().to_string();
                 file_to_edit.push_str(file_to_find.as_str());
                 File::create(file_to_edit.clone());
@@ -799,8 +841,7 @@ impl AppDelegate<AppState> for Delegate {
                 f2.write_all(new_content.as_bytes()).unwrap();
                 f2.flush().unwrap();
 
-                //let mut zip = ZipWriter::new(file);
-                //zip.add_directory("prova", FileOptions::default());
+
 
 
                 doit(dest_path.to_str().unwrap(), file_info.path().to_str().unwrap(), CompressionMethod::Bzip2);
@@ -887,6 +928,8 @@ impl AppDelegate<AppState> for Delegate {
 
                     for f in archive.files.clone() {
                         if f.contains("OEBPS") && (f.contains("htm.html") || f.contains("wrap")) {
+
+                            println!("File aperto {}",f);
                             data.ebook.push_back(Page::new());
                             if f.contains("wrap") {
                                 past_page_no = page_no;
@@ -934,8 +977,8 @@ impl AppDelegate<AppState> for Delegate {
 
                                 if page_occ > 0 {
                                     let mut pos_pageno = res.as_ref().unwrap()[init.unwrap()..].find("<span class=\"x-ebookmaker-pageno\"").unwrap();
-                                    pos_pageno += res.as_ref().unwrap()[init.unwrap() + pos_pageno..].find("</span>").unwrap() + 6;
-                                    let mut text = res.as_ref().unwrap()[init.unwrap()..]._substr(0, pos_pageno);
+                                    pos_pageno += res.as_ref().unwrap()[init.unwrap() + pos_pageno..].find("</span>").unwrap() + 7;
+                                    let mut text = res.as_ref().unwrap()[init.unwrap()..pos_pageno].to_string().clone();
                                     let mut img_occ = text.matches("<img").count();
                                     let mut pos = text.find("<img");
                                     if img_occ > 0 {
@@ -1080,7 +1123,7 @@ impl AppDelegate<AppState> for Delegate {
                                     }
 
                                     page_not_ended = true;
-                                    text = res.as_ref().unwrap()[init.unwrap() + pos_pageno..]._substr(0, res.as_ref().unwrap().len());
+                                    text = res.as_ref().unwrap()[init.unwrap() + pos_pageno..res.as_ref().unwrap().len()].to_string().clone();
                                     img_occ = text.matches("<img").count();
                                     pos = text.find("<img");
 
@@ -1205,7 +1248,7 @@ impl AppDelegate<AppState> for Delegate {
                                             }
                                         }
                                     }
-                                    data.ebook[page_no].text.push_str(res.as_ref().unwrap()[init.unwrap()..]._substr(0, res.as_ref().unwrap().len()).as_str());
+                                    data.ebook[page_no].text.push_str(res.as_ref().unwrap()[init.unwrap()..res.as_ref().unwrap().len()].to_string().clone().as_str());
 
                                     page_no += 1;
                                 }

@@ -334,7 +334,6 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
                 }
             }
         }else{
-            println!("Dentro else is_some");
             //mi trovo in mezzo a piu pagine
             for element in state.ebook[state.current_page].text.split("\n") {
                 if element.contains("img") {

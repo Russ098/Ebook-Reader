@@ -1,6 +1,6 @@
 use std::error::Error;
 use std::{fs, io};
-use druid::{Data, Lens, EventCtx, Env, ArcStr, KeyOrValue, FontFamily, commands, AppDelegate, DelegateCtx, Target, Command, Handled, ImageBuf, Widget, WidgetExt, Event, LifeCycleCtx, LifeCycle, UpdateCtx, LayoutCtx, BoxConstraints, Size, PaintCtx, WidgetId, WindowHandle, LensExt, Selector, WindowDesc, AppLauncher, FileInfo, WindowId};
+use druid::{Data, Lens, EventCtx, Env, ArcStr, KeyOrValue, FontFamily, commands, AppDelegate, DelegateCtx, Target, Command, Handled, ImageBuf, Widget, WidgetExt, Event, LifeCycleCtx, LifeCycle, UpdateCtx, LayoutCtx, BoxConstraints, Size, PaintCtx, WidgetId, WindowHandle, LensExt, Selector, WindowDesc, AppLauncher, FileInfo, WindowId, FileDialogOptions, FileSpec};
 use druid::text::{RichText, Attribute};
 use epub::doc::EpubDoc;
 use std::fs::{DirEntry, File};
@@ -200,6 +200,7 @@ pub struct AppState {
     pub string_bookmark: String,
     pub current_page_text: String,
     pub file_info: String,
+    pub scan_mode: bool,
 }
 
 impl AppState {
@@ -219,6 +220,7 @@ impl AppState {
             string_bookmark: String::new(),
             current_page_text: String::new(),
             file_info: String::new(),
+            scan_mode: false,
 
         }
     }
@@ -265,52 +267,6 @@ impl AppState {
                 .title("Edit Ebook")
                 .window_size(Size::new(1200., 700.));
 
-
-            /*            let event_loop = EventLoop::new();
-                        let window = WindowBuilder::new().build(&event_loop).unwrap();
-
-
-                        event_loop.run(move |event, _, control_flow| {
-                            // ControlFlow::Poll continuously runs the event loop, even if the OS hasn't
-                            // dispatched any events. This is ideal for games and similar applications.
-                            control_flow.set_poll();
-
-                            // ControlFlow::Wait pauses the event loop if no events are available to process.
-                            // This is ideal for non-game applications that only update in response to user
-                            // input, and uses significantly less power/CPU time than ControlFlow::Poll.
-                            control_flow.set_wait();
-
-                            match event {
-                                Other_Event::WindowEvent {
-                                    event: WindowEvent::CloseRequested,
-                                    ..
-                                } => {
-                                    println!("The close button was pressed; stopping");
-                                    //_ctx.submit_command(commands::CLOSE_WINDOW.to(new_win.id));
-                                },
-                                Other_Event::MainEventsCleared => {
-                                    // Application update code.
-
-                                    // Queue a RedrawRequested event.
-                                    //
-                                    // You only need to call this if you've determined that you need to redraw, in
-                                    // applications which do not always need to. Applications that redraw continuously
-                                    // can just render here instead.
-                                    window.request_redraw();
-                                },
-                                Other_Event::RedrawRequested(_) => {
-                                    // Redraw the application.
-                                    //
-                                    // It's preferable for applications that do not render continuously to render in
-                                    // this event rather than in MainEventsCleared, since rendering in here allows
-                                    // the program to gracefully handle redraws requested by the OS.
-                                },
-                                _ => ()
-                            }
-                        });
-
-                        */
-
             _ctx.new_window(new_win);
 
             data.load_from_json();
@@ -319,23 +275,28 @@ impl AppState {
 
 
     pub fn click_save_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
-        if data.ebook.len() == 0 {
-            let dialog = MessageDialog::new()
-                .set_type(MessageType::Info)
-                .set_text("Please select an Ebook to enable this function.")
-                .set_title("Ebook not selected")
-                .show_alert();
-        } else if data.edit_mode {
-            let dialog = MessageDialog::new()
-                .set_type(MessageType::Warning)
-                .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
-                .set_title("Ebook in edit mode")
-                .show_alert();
-        } else {
-            data.saves.last_page = data.current_page;
-            //TODO: aggiornare anche i bookmarks
-            data.save_to_json();
-        }
+        data.scan_mode = true;
+
+        let jpg = FileSpec::new("Jpg file", &["jpg"]);
+        let png = FileSpec::new("Png file", &["png"]);
+        let default_save_name = String::from("MyFile.jpg");
+
+        let save_dialog_options = FileDialogOptions::new()
+            .allowed_types(vec![jpg, png])
+            .default_type(jpg)
+            .default_name(default_save_name)
+            .name_label("Target")
+            .title("Choose a target for this lovely file")
+            .button_text("Export");
+
+        let open_dialog_options = save_dialog_options
+            .clone()
+            .default_name("MySavedFile.epub")
+            .name_label("Source")
+            .title("Where did you put that file?")
+            .button_text("Import");
+
+        _ctx.submit_command(druid::commands::SHOW_OPEN_PANEL.with(open_dialog_options.clone()));
     }
 
     pub fn click_bookmark_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
@@ -637,6 +598,7 @@ pub fn doit(src_dir: &str, dst_file: &str, method: zip::CompressionMethod) -> zi
 pub const GO_TO_POS: Selector<usize> = Selector::new("go_to_pos");
 pub const DELETE_BOOKMARK: Selector<(String, usize)> = Selector::new("delete_bookmark");
 pub const MODIFY_EDIT_MODE: Selector<bool> = Selector::new("modify_edit_mode");
+pub const SCAN_OCR_FILE: Selector<String> = Selector::new("scan_file");
 
 pub struct Delegate;
 
@@ -858,6 +820,64 @@ impl AppDelegate<AppState> for Delegate {
             }
         }
 
+        if data.scan_mode{
+            if let Some(file_info_scan) = cmd.get(commands::OPEN_FILE) {
+                println!("File selezionato: {}", file_info_scan.path().to_str().unwrap());
+
+
+
+                let output = if cfg!(target_os = "windows") {
+                    std::process::Command::new("tesseract")
+                        .args([file_info_scan.path().to_str().unwrap(), "stdout"])
+                        .output()
+                        .expect("failed to execute process")
+                } else {
+                    std::process::Command::new("sh")
+                        .arg("-c")
+                        .arg("echo hello")
+                        .output()
+                        .expect("failed to execute process")
+                };
+
+                let hello = output.stdout;
+                let s = String::from_utf8(hello).unwrap();
+
+                println!("Output: {} len: {}",s, s.len());
+                let mut count = 0;
+                let mut percentage = 0;
+                let mut index = 0;
+
+
+                data.ebook.iter().enumerate().for_each(|(i, x)| {
+
+                    if x.text.len() > 0 {
+                        for elem in s.split_whitespace() {
+                            println!("Elemento {}", elem);
+                            if x.text.contains(elem) && x.text.len() > 0 && elem._is_alphadigit() {
+                                count += 1;
+                                println!("Entro e modifica {}", count);
+                            }
+
+
+                        }
+
+                        let temp = x.text._strip_tags().split_whitespace().count();
+
+                        if count / temp > percentage {
+                            percentage = count / temp;
+                            index = i;
+                        }
+                        count = 0;
+                    }
+
+                });
+
+                println!("pagina trovata {}", index);
+
+            }
+        }
+
+
         if cmd.is(MODIFY_EDIT_MODE) {
             let pos = cmd.get_unchecked(MODIFY_EDIT_MODE);
             data.edit_mode = *pos;
@@ -884,177 +904,101 @@ impl AppDelegate<AppState> for Delegate {
         }
 
 
-        if let Some(file_info) = cmd.get(commands::OPEN_FILE) {
-            if data.edit_mode {
-                let dialog = MessageDialog::new()
-                    .set_type(MessageType::Warning)
-                    .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
-                    .set_title("Ebook in edit mode")
-                    .show_alert();
-                return Handled::Yes;
-            }
+        if !data.scan_mode{
+            if let Some(file_info) = cmd.get(commands::OPEN_FILE) {
+                if data.edit_mode {
+                    let dialog = MessageDialog::new()
+                        .set_type(MessageType::Warning)
+                        .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
+                        .set_title("Ebook in edit mode")
+                        .show_alert();
+                    return Handled::Yes;
+                }
 
-            data.file_info = file_info.clone().path().to_str().unwrap().to_string();
-            match EpubArchive::new(file_info.clone().path())
-            {
-                Ok(mut archive) => {
-                    if data.ebook.len() > 0 {
-                        //TODO: aggiornare anche i bookmarks
-                        data.saves.last_page = data.current_page;
-                        data.save_to_json();
-                    }
+                data.file_info = file_info.clone().path().to_str().unwrap().to_string();
+                match EpubArchive::new(file_info.clone().path())
+                {
+                    Ok(mut archive) => {
+                        if data.ebook.len() > 0 {
+                            //TODO: aggiornare anche i bookmarks
+                            data.saves.last_page = data.current_page;
+                            data.save_to_json();
+                        }
 
-                    data.ebook.clear();
-                    data.current_page = 0;
-                    data.title = file_info.clone().path().to_str().unwrap().split("\\")
-                        .last().unwrap().split(".")
-                        .next().unwrap().to_string();
-                    data.saves.last_page = 0;
-                    data.saves.bookmarks.clear();
-                    data.display_menu = false;
-                    data.edit_mode = false;
-                    data.new_bookmark = false;
-                    data.chapters.clear();
+                        data.ebook.clear();
+                        data.current_page = 0;
+                        data.title = file_info.clone().path().to_str().unwrap().split("\\")
+                            .last().unwrap().split(".")
+                            .next().unwrap().to_string();
+                        data.saves.last_page = 0;
+                        data.saves.bookmarks.clear();
+                        data.display_menu = false;
+                        data.edit_mode = false;
+                        data.new_bookmark = false;
+                        data.chapters.clear();
 
-                    data.load_from_json();
+                        data.load_from_json();
 
-                    let mut page_no = 1;
-                    let mut page_not_ended = false;
-                    let mut chapter_title: String = String::new();
-                    let mut past_page_no = 0;
+                        let mut page_no = 1;
+                        let mut page_not_ended = false;
+                        let mut chapter_title: String = String::new();
+                        let mut past_page_no = 0;
 
 
-                    alphanumeric_sort::sort_path_slice(&mut archive.files);
+                        alphanumeric_sort::sort_path_slice(&mut archive.files);
 
-                    for f in archive.files.clone() {
-                        if f.contains("OEBPS") && (f.contains("htm.html") || f.contains("wrap")) {
-
-                            println!("File aperto {}",f);
-                            data.ebook.push_back(Page::new());
-                            if f.contains("wrap") {
-                                past_page_no = page_no;
-                                page_no = 0;
-                            } else {
+                        for f in archive.files.clone() {
+                            if f.contains("OEBPS") && (f.contains("htm.html") || f.contains("wrap")) {
+                                println!("File aperto {}", f);
                                 data.ebook.push_back(Page::new());
-                            }
-
-                            let res = archive.get_entry_as_str(f.clone());
-
-                            if res.is_ok() {
-                                let init = res.as_ref().unwrap().find("<?xml");
-
-                                if res.as_ref().unwrap()[init.unwrap()..].contains("class=\"x-ebookmaker-cover\"") {
-                                    chapter_title = "COVER".to_string();
-                                } else if res.as_ref().unwrap()[init.unwrap()..].contains("START OF THIS PROJECT GUTENBERG EBOOK") {
-                                    chapter_title = "START OF THIS PROJECT GUTENBERG EBOOK".to_string();
-                                } else if res.as_ref().unwrap()[init.unwrap()..].contains("END OF THIS PROJECT GUTENBERG EBOOK") {
-                                    chapter_title = "END OF THIS PROJECT GUTENBERG EBOOK".to_string();
-                                } else if res.as_ref().unwrap()[init.unwrap()..].contains("CONTENTS") {
-                                    chapter_title = "CONTENTS".to_string();
-                                } else if res.as_ref().unwrap()[init.unwrap()..].contains("pgepubid00000") {
-                                    let inizio = res.as_ref().unwrap().find("<title>").unwrap();
-                                    let fine = res.as_ref().unwrap().find("</title>").unwrap();
-                                    chapter_title = strip_tags(&res.as_ref().unwrap()[inizio..fine].replace("\n", "").trim_start().trim_end());
-                                } else if res.as_ref().unwrap()[init.unwrap()..].contains("PREFACE") {
-                                    chapter_title = "PREFACE".to_string();
-                                } else if res.as_ref().unwrap()[init.unwrap()..].contains("ILLUSTRATIONS") {
-                                    chapter_title = "ILLUSTRATIONS".to_string();
-                                } else if res.as_ref().unwrap().find("<div class=\"chapter\"").is_none() {
-                                    chapter_title = "POSTFACE".to_string();
+                                if f.contains("wrap") {
+                                    past_page_no = page_no;
+                                    page_no = 0;
                                 } else {
-                                    chapter_title = strip_tags(&res.as_ref().unwrap()[res.as_ref().unwrap().find("<div class=\"chapter\"").unwrap()..res.as_ref().unwrap().find("</div>").unwrap()])
-                                        .replace("\n", " ").trim_start().trim_end().to_string();
+                                    data.ebook.push_back(Page::new());
                                 }
 
-                                if chapter_title.eq("COVER") {
-                                    data.chapters.push_front(Chapter::from(chapter_title, page_no));
-                                } else {
-                                    data.chapters.push_back(Chapter::from(chapter_title, page_no));
-                                }
+                                let res = archive.get_entry_as_str(f.clone());
 
+                                if res.is_ok() {
+                                    let init = res.as_ref().unwrap().find("<?xml");
 
-                                let page_occ = res.as_ref().unwrap()[init.unwrap()..].matches("<span class=\"x-ebookmaker-pageno\"").count();
-
-                                if page_occ > 0 {
-                                    let mut pos_pageno = res.as_ref().unwrap()[init.unwrap()..].find("<span class=\"x-ebookmaker-pageno\"").unwrap();
-                                    pos_pageno += res.as_ref().unwrap()[init.unwrap() + pos_pageno..].find("</span>").unwrap() + 7;
-                                    let mut text = res.as_ref().unwrap()[init.unwrap()..pos_pageno].to_string().clone();
-                                    let mut img_occ = text.matches("<img").count();
-                                    let mut pos = text.find("<img");
-                                    if img_occ > 0 {
-                                        if pos.is_some() {
-                                            let mut displacement: usize = 0;
-                                            for i in 0..img_occ {
-                                                let mut s1 = String::from("OEBPS/");
-                                                let mut app = text[pos.unwrap() + 3 + displacement..].find("src=");
-                                                for c in text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].chars() {
-                                                    if c == '"' {
-                                                        break;
-                                                    } else {
-                                                        s1.push(c);
-                                                    }
-                                                }
-                                                let (width, height) = match blob_size(archive.get_entry(s1.clone()).unwrap().as_slice()) {
-                                                    Ok(dim) => { (dim.width, dim.height) }
-                                                    Err(why) => {
-                                                        println!("Error getting dimensions: {:?}", why);
-                                                        (0, 0)
-                                                    }
-                                                };
-
-                                                let mut r;
-
-                                                if s1.to_lowercase().contains("jpg") || s1.to_lowercase().contains("jpeg") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Jpeg).unwrap();
-                                                } else if s1.to_lowercase().contains("png") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Png).unwrap();
-                                                } else if s1.to_lowercase().contains("gif") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Gif).unwrap();
-                                                } else if s1.to_lowercase().contains("webp") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::WebP).unwrap();
-                                                } else if s1.to_lowercase().contains("pnm") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Pnm).unwrap();
-                                                } else if s1.to_lowercase().contains("tiff") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tiff).unwrap();
-                                                } else if s1.to_lowercase().contains("tga") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tga).unwrap();
-                                                } else if s1.to_lowercase().contains("bmp") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Bmp).unwrap();
-                                                } else if s1.to_lowercase().contains("ico") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Ico).unwrap();
-                                                } else if s1.to_lowercase().contains("hdr") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Hdr).unwrap();
-                                                } else {
-                                                    panic!("Formato non supportato");
-                                                }
-                                                let result = r.into_bytes();
-                                                if page_not_ended {
-                                                    data.ebook[page_no - 1].images.push_back(ImageOfPage::from(Vector::from(result), width, height));
-                                                } else {
-                                                    data.ebook[page_no].images.push_back(ImageOfPage::from(Vector::from(result), width, height));
-                                                }
-                                                let resapp = text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].find("<img");
-                                                displacement = pos.unwrap() + 3 + app.unwrap() + 5 + displacement;
-                                                pos = resapp;
-                                            }
-                                        }
-                                    }
-
-                                    if !page_not_ended {
-                                        data.ebook[page_no].text.push_str(text.as_str());
-                                        data.ebook.push_back(Page::new());
-                                        page_no += 1;
+                                    if res.as_ref().unwrap()[init.unwrap()..].contains("class=\"x-ebookmaker-cover\"") {
+                                        chapter_title = "COVER".to_string();
+                                    } else if res.as_ref().unwrap()[init.unwrap()..].contains("START OF THIS PROJECT GUTENBERG EBOOK") {
+                                        chapter_title = "START OF THIS PROJECT GUTENBERG EBOOK".to_string();
+                                    } else if res.as_ref().unwrap()[init.unwrap()..].contains("END OF THIS PROJECT GUTENBERG EBOOK") {
+                                        chapter_title = "END OF THIS PROJECT GUTENBERG EBOOK".to_string();
+                                    } else if res.as_ref().unwrap()[init.unwrap()..].contains("CONTENTS") {
+                                        chapter_title = "CONTENTS".to_string();
+                                    } else if res.as_ref().unwrap()[init.unwrap()..].contains("pgepubid00000") {
+                                        let inizio = res.as_ref().unwrap().find("<title>").unwrap();
+                                        let fine = res.as_ref().unwrap().find("</title>").unwrap();
+                                        chapter_title = strip_tags(&res.as_ref().unwrap()[inizio..fine].replace("\n", "").trim_start().trim_end());
+                                    } else if res.as_ref().unwrap()[init.unwrap()..].contains("PREFACE") {
+                                        chapter_title = "PREFACE".to_string();
+                                    } else if res.as_ref().unwrap()[init.unwrap()..].contains("ILLUSTRATIONS") {
+                                        chapter_title = "ILLUSTRATIONS".to_string();
+                                    } else if res.as_ref().unwrap().find("<div class=\"chapter\"").is_none() {
+                                        chapter_title = "POSTFACE".to_string();
                                     } else {
-                                        data.ebook[page_no - 1].text.push_str(text.as_str());
-                                        page_not_ended = false;
+                                        chapter_title = strip_tags(&res.as_ref().unwrap()[res.as_ref().unwrap().find("<div class=\"chapter\"").unwrap()..res.as_ref().unwrap().find("</div>").unwrap()])
+                                            .replace("\n", " ").trim_start().trim_end().to_string();
                                     }
 
-                                    pos_pageno += 1;
+                                    if chapter_title.eq("COVER") {
+                                        data.chapters.push_front(Chapter::from(chapter_title, page_no));
+                                    } else {
+                                        data.chapters.push_back(Chapter::from(chapter_title, page_no));
+                                    }
 
-                                    for i in 1..page_occ {
-                                        let mut next_page = res.as_ref().unwrap()[init.unwrap() + pos_pageno..].find("<span class=\"x-ebookmaker-pageno\"").unwrap();
-                                        next_page += res.as_ref().unwrap()[init.unwrap() + pos_pageno + next_page..].find("</span>").unwrap() + 6;
-                                        let mut text = res.as_ref().unwrap()[init.unwrap() + pos_pageno..init.unwrap() + pos_pageno + next_page + 1].to_string().clone();
+
+                                    let page_occ = res.as_ref().unwrap()[init.unwrap()..].matches("<span class=\"x-ebookmaker-pageno\"").count();
+
+                                    if page_occ > 0 {
+                                        let mut pos_pageno = res.as_ref().unwrap()[init.unwrap()..].find("<span class=\"x-ebookmaker-pageno\"").unwrap();
+                                        pos_pageno += res.as_ref().unwrap()[init.unwrap() + pos_pageno..].find("</span>").unwrap() + 7;
+                                        let mut text = res.as_ref().unwrap()[init.unwrap()..pos_pageno].to_string().clone();
                                         let mut img_occ = text.matches("<img").count();
                                         let mut pos = text.find("<img");
                                         if img_occ > 0 {
@@ -1116,155 +1060,232 @@ impl AppDelegate<AppState> for Delegate {
                                             }
                                         }
 
+                                        if !page_not_ended {
+                                            data.ebook[page_no].text.push_str(text.as_str());
+                                            data.ebook.push_back(Page::new());
+                                            page_no += 1;
+                                        } else {
+                                            data.ebook[page_no - 1].text.push_str(text.as_str());
+                                            page_not_ended = false;
+                                        }
+
+                                        pos_pageno += 1;
+
+                                        for i in 1..page_occ {
+                                            let mut next_page = res.as_ref().unwrap()[init.unwrap() + pos_pageno..].find("<span class=\"x-ebookmaker-pageno\"").unwrap();
+                                            next_page += res.as_ref().unwrap()[init.unwrap() + pos_pageno + next_page..].find("</span>").unwrap() + 6;
+                                            let mut text = res.as_ref().unwrap()[init.unwrap() + pos_pageno..init.unwrap() + pos_pageno + next_page + 1].to_string().clone();
+                                            let mut img_occ = text.matches("<img").count();
+                                            let mut pos = text.find("<img");
+                                            if img_occ > 0 {
+                                                if pos.is_some() {
+                                                    let mut displacement: usize = 0;
+                                                    for i in 0..img_occ {
+                                                        let mut s1 = String::from("OEBPS/");
+                                                        let mut app = text[pos.unwrap() + 3 + displacement..].find("src=");
+                                                        for c in text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].chars() {
+                                                            if c == '"' {
+                                                                break;
+                                                            } else {
+                                                                s1.push(c);
+                                                            }
+                                                        }
+                                                        let (width, height) = match blob_size(archive.get_entry(s1.clone()).unwrap().as_slice()) {
+                                                            Ok(dim) => { (dim.width, dim.height) }
+                                                            Err(why) => {
+                                                                println!("Error getting dimensions: {:?}", why);
+                                                                (0, 0)
+                                                            }
+                                                        };
+
+                                                        let mut r;
+
+                                                        if s1.to_lowercase().contains("jpg") || s1.to_lowercase().contains("jpeg") {
+                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Jpeg).unwrap();
+                                                        } else if s1.to_lowercase().contains("png") {
+                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Png).unwrap();
+                                                        } else if s1.to_lowercase().contains("gif") {
+                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Gif).unwrap();
+                                                        } else if s1.to_lowercase().contains("webp") {
+                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::WebP).unwrap();
+                                                        } else if s1.to_lowercase().contains("pnm") {
+                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Pnm).unwrap();
+                                                        } else if s1.to_lowercase().contains("tiff") {
+                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tiff).unwrap();
+                                                        } else if s1.to_lowercase().contains("tga") {
+                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tga).unwrap();
+                                                        } else if s1.to_lowercase().contains("bmp") {
+                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Bmp).unwrap();
+                                                        } else if s1.to_lowercase().contains("ico") {
+                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Ico).unwrap();
+                                                        } else if s1.to_lowercase().contains("hdr") {
+                                                            r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Hdr).unwrap();
+                                                        } else {
+                                                            panic!("Formato non supportato");
+                                                        }
+                                                        let result = r.into_bytes();
+                                                        if page_not_ended {
+                                                            data.ebook[page_no - 1].images.push_back(ImageOfPage::from(Vector::from(result), width, height));
+                                                        } else {
+                                                            data.ebook[page_no].images.push_back(ImageOfPage::from(Vector::from(result), width, height));
+                                                        }
+                                                        let resapp = text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].find("<img");
+                                                        displacement = pos.unwrap() + 3 + app.unwrap() + 5 + displacement;
+                                                        pos = resapp;
+                                                    }
+                                                }
+                                            }
+
+                                            data.ebook[page_no].text.push_str(text.as_str());
+                                            data.ebook.push_back(Page::new());
+                                            page_no += 1;
+                                            pos_pageno += next_page + 1;
+                                        }
+
+                                        page_not_ended = true;
+                                        text = res.as_ref().unwrap()[init.unwrap() + pos_pageno..res.as_ref().unwrap().len()].to_string().clone();
+                                        img_occ = text.matches("<img").count();
+                                        pos = text.find("<img");
+
+                                        if img_occ > 0 {
+                                            if pos.is_some() {
+                                                let mut displacement: usize = 0;
+                                                for i in 0..img_occ {
+                                                    let mut s1 = String::from("OEBPS/");
+                                                    let mut app = text[pos.unwrap() + 3 + displacement..].find("src=");
+                                                    for c in text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].chars() {
+                                                        if c == '"' {
+                                                            break;
+                                                        } else {
+                                                            s1.push(c);
+                                                        }
+                                                    }
+                                                    let (width, height) = match blob_size(archive.get_entry(s1.clone()).unwrap().as_slice()) {
+                                                        Ok(dim) => { (dim.width, dim.height) }
+                                                        Err(why) => {
+                                                            println!("Error getting dimensions: {:?}", why);
+                                                            (0, 0)
+                                                        }
+                                                    };
+
+                                                    let mut r;
+
+                                                    if s1.to_lowercase().contains("jpg") || s1.to_lowercase().contains("jpeg") {
+                                                        r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Jpeg).unwrap();
+                                                    } else if s1.to_lowercase().contains("png") {
+                                                        r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Png).unwrap();
+                                                    } else if s1.to_lowercase().contains("gif") {
+                                                        r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Gif).unwrap();
+                                                    } else if s1.to_lowercase().contains("webp") {
+                                                        r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::WebP).unwrap();
+                                                    } else if s1.to_lowercase().contains("pnm") {
+                                                        r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Pnm).unwrap();
+                                                    } else if s1.to_lowercase().contains("tiff") {
+                                                        r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tiff).unwrap();
+                                                    } else if s1.to_lowercase().contains("tga") {
+                                                        r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tga).unwrap();
+                                                    } else if s1.to_lowercase().contains("bmp") {
+                                                        r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Bmp).unwrap();
+                                                    } else if s1.to_lowercase().contains("ico") {
+                                                        r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Ico).unwrap();
+                                                    } else if s1.to_lowercase().contains("hdr") {
+                                                        r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Hdr).unwrap();
+                                                    } else {
+                                                        panic!("Formato non supportato");
+                                                    }
+                                                    let result = r.into_bytes();
+                                                    data.ebook[page_no].images.push_back(ImageOfPage::from(Vector::from(result), width, height));
+                                                    let resapp = text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].find("<img");
+                                                    displacement = pos.unwrap() + 3 + app.unwrap() + 5 + displacement;
+                                                    pos = resapp;
+                                                }
+                                            }
+                                        }
+
                                         data.ebook[page_no].text.push_str(text.as_str());
+
                                         data.ebook.push_back(Page::new());
                                         page_no += 1;
-                                        pos_pageno += next_page + 1;
                                     }
 
-                                    page_not_ended = true;
-                                    text = res.as_ref().unwrap()[init.unwrap() + pos_pageno..res.as_ref().unwrap().len()].to_string().clone();
-                                    img_occ = text.matches("<img").count();
-                                    pos = text.find("<img");
+                                    //TODO: revisionare una volta fatto il salvataggio (per la questione relativa al segnalibro:
+                                    // quando chiudo l'app, la prossima riapertura mi riporta all'ultima pagina letta (?))
+                                    // let res = archive.get_entry_as_str(f);
+                                    else {
+                                        page_not_ended = false;
+                                        let img_occ = res.as_ref().unwrap()[init.unwrap()..].matches("<img").count();
+                                        let mut pos = res.as_ref().unwrap()[init.unwrap()..].find("<img");
+                                        if img_occ > 0 {
+                                            if pos.is_some() {
+                                                let mut displacement: usize = 0;
+                                                for i in 0..img_occ {
+                                                    let mut s1 = String::from("OEBPS/");
+                                                    let mut app = res.as_ref().unwrap()[pos.unwrap() + 3 + displacement..].find("src=");
+                                                    for c in res.as_ref().unwrap()[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].chars() {
+                                                        if c == '"' {
+                                                            break;
+                                                        } else {
+                                                            s1.push(c);
+                                                        }
+                                                    }
+                                                    let (width, height) = match blob_size(archive.get_entry(s1.clone()).unwrap().as_slice()) {
+                                                        Ok(dim) => { (dim.width, dim.height) }
+                                                        Err(why) => {
+                                                            println!("Error getting dimensions: {:?}", why);
+                                                            (0, 0)
+                                                        }
+                                                    };
 
-                                    if img_occ > 0 {
-                                        if pos.is_some() {
-                                            let mut displacement: usize = 0;
-                                            for i in 0..img_occ {
-                                                let mut s1 = String::from("OEBPS/");
-                                                let mut app = text[pos.unwrap() + 3 + displacement..].find("src=");
-                                                for c in text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].chars() {
-                                                    if c == '"' {
-                                                        break;
+                                                    let mut r;
+                                                    if s1.to_lowercase().contains("jpg") || s1.to_lowercase().contains("jpeg") {
+                                                        r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Jpeg).unwrap();
+                                                    } else if s1.to_lowercase().contains("png") {
+                                                        r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Png).unwrap();
+                                                    } else if s1.to_lowercase().contains("gif") {
+                                                        r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Gif).unwrap();
+                                                    } else if s1.to_lowercase().contains("webp") {
+                                                        r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::WebP).unwrap();
+                                                    } else if s1.to_lowercase().contains("pnm") {
+                                                        r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Pnm).unwrap();
+                                                    } else if s1.to_lowercase().contains("tiff") {
+                                                        r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tiff).unwrap();
+                                                    } else if s1.to_lowercase().contains("tga") {
+                                                        r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tga).unwrap();
+                                                    } else if s1.to_lowercase().contains("bmp") {
+                                                        r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Bmp).unwrap();
+                                                    } else if s1.to_lowercase().contains("ico") {
+                                                        r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Ico).unwrap();
+                                                    } else if s1.to_lowercase().contains("hdr") {
+                                                        r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Hdr).unwrap();
                                                     } else {
-                                                        s1.push(c);
+                                                        panic!("Formato non supportato");
                                                     }
+                                                    let result = r.into_bytes();
+                                                    data.ebook[page_no].images.push_back(ImageOfPage::from(Vector::from(result), width, height));
+                                                    let resapp = res.as_ref().unwrap()[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].find("<img");
+                                                    displacement = pos.unwrap() + 3 + app.unwrap() + 5 + displacement;
+                                                    pos = resapp;
                                                 }
-                                                let (width, height) = match blob_size(archive.get_entry(s1.clone()).unwrap().as_slice()) {
-                                                    Ok(dim) => { (dim.width, dim.height) }
-                                                    Err(why) => {
-                                                        println!("Error getting dimensions: {:?}", why);
-                                                        (0, 0)
-                                                    }
-                                                };
-
-                                                let mut r;
-
-                                                if s1.to_lowercase().contains("jpg") || s1.to_lowercase().contains("jpeg") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Jpeg).unwrap();
-                                                } else if s1.to_lowercase().contains("png") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Png).unwrap();
-                                                } else if s1.to_lowercase().contains("gif") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Gif).unwrap();
-                                                } else if s1.to_lowercase().contains("webp") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::WebP).unwrap();
-                                                } else if s1.to_lowercase().contains("pnm") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Pnm).unwrap();
-                                                } else if s1.to_lowercase().contains("tiff") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tiff).unwrap();
-                                                } else if s1.to_lowercase().contains("tga") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tga).unwrap();
-                                                } else if s1.to_lowercase().contains("bmp") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Bmp).unwrap();
-                                                } else if s1.to_lowercase().contains("ico") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Ico).unwrap();
-                                                } else if s1.to_lowercase().contains("hdr") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Hdr).unwrap();
-                                                } else {
-                                                    panic!("Formato non supportato");
-                                                }
-                                                let result = r.into_bytes();
-                                                data.ebook[page_no].images.push_back(ImageOfPage::from(Vector::from(result), width, height));
-                                                let resapp = text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].find("<img");
-                                                displacement = pos.unwrap() + 3 + app.unwrap() + 5 + displacement;
-                                                pos = resapp;
                                             }
                                         }
+                                        data.ebook[page_no].text.push_str(res.as_ref().unwrap()[init.unwrap()..res.as_ref().unwrap().len()].to_string().clone().as_str());
+
+                                        page_no += 1;
                                     }
-
-                                    data.ebook[page_no].text.push_str(text.as_str());
-
-                                    data.ebook.push_back(Page::new());
-                                    page_no += 1;
                                 }
-
-                                //TODO: revisionare una volta fatto il salvataggio (per la questione relativa al segnalibro:
-                                // quando chiudo l'app, la prossima riapertura mi riporta all'ultima pagina letta (?))
-                                // let res = archive.get_entry_as_str(f);
-                                else {
-                                    page_not_ended = false;
-                                    let img_occ = res.as_ref().unwrap()[init.unwrap()..].matches("<img").count();
-                                    let mut pos = res.as_ref().unwrap()[init.unwrap()..].find("<img");
-                                    if img_occ > 0 {
-                                        if pos.is_some() {
-                                            let mut displacement: usize = 0;
-                                            for i in 0..img_occ {
-                                                let mut s1 = String::from("OEBPS/");
-                                                let mut app = res.as_ref().unwrap()[pos.unwrap() + 3 + displacement..].find("src=");
-                                                for c in res.as_ref().unwrap()[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].chars() {
-                                                    if c == '"' {
-                                                        break;
-                                                    } else {
-                                                        s1.push(c);
-                                                    }
-                                                }
-                                                let (width, height) = match blob_size(archive.get_entry(s1.clone()).unwrap().as_slice()) {
-                                                    Ok(dim) => { (dim.width, dim.height) }
-                                                    Err(why) => {
-                                                        println!("Error getting dimensions: {:?}", why);
-                                                        (0, 0)
-                                                    }
-                                                };
-
-                                                let mut r;
-                                                if s1.to_lowercase().contains("jpg") || s1.to_lowercase().contains("jpeg") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Jpeg).unwrap();
-                                                } else if s1.to_lowercase().contains("png") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Png).unwrap();
-                                                } else if s1.to_lowercase().contains("gif") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Gif).unwrap();
-                                                } else if s1.to_lowercase().contains("webp") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::WebP).unwrap();
-                                                } else if s1.to_lowercase().contains("pnm") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Pnm).unwrap();
-                                                } else if s1.to_lowercase().contains("tiff") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tiff).unwrap();
-                                                } else if s1.to_lowercase().contains("tga") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Tga).unwrap();
-                                                } else if s1.to_lowercase().contains("bmp") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Bmp).unwrap();
-                                                } else if s1.to_lowercase().contains("ico") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Ico).unwrap();
-                                                } else if s1.to_lowercase().contains("hdr") {
-                                                    r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Hdr).unwrap();
-                                                } else {
-                                                    panic!("Formato non supportato");
-                                                }
-                                                let result = r.into_bytes();
-                                                data.ebook[page_no].images.push_back(ImageOfPage::from(Vector::from(result), width, height));
-                                                let resapp = res.as_ref().unwrap()[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].find("<img");
-                                                displacement = pos.unwrap() + 3 + app.unwrap() + 5 + displacement;
-                                                pos = resapp;
-                                            }
-                                        }
-                                    }
-                                    data.ebook[page_no].text.push_str(res.as_ref().unwrap()[init.unwrap()..res.as_ref().unwrap().len()].to_string().clone().as_str());
-
-                                    page_no += 1;
+                                if f.contains("wrap") {
+                                    page_no = past_page_no;
                                 }
-                            }
-                            if f.contains("wrap") {
-                                page_no = past_page_no;
                             }
                         }
                     }
+                    Err(error) => {
+                        //TODO
+                        println!("Error while opening archive: {}", error);
+                    }
                 }
-                Err(error) => {
-                    //TODO
-                    println!("Error while opening archive: {}", error);
-                }
+                return Handled::Yes;
             }
-            return Handled::Yes;
         }
         Handled::No
     }

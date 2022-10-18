@@ -56,7 +56,8 @@ fn option_row() -> impl Widget<AppState> {
 
     });
     let edit_button = Button::new("Edit").padding(5.0).on_click(AppState::click_edit_button);
-    let save_button = Button::new("Save").padding(5.0).on_click(AppState::click_save_button);
+    let scan_button = Button::new("Scan").padding(5.0).on_click(AppState::click_save_button);
+
     //let bookmark_button = Button::new("Bookmark").padding(5.0).on_click(AppState::click_bookmark_button);
     let previous_button = Button::new("Previous Page").padding(5.0).on_click(AppState::click_previous_button);
     let next_button = Button::new("Next Page").padding(5.0).on_click(AppState::click_next_button);
@@ -64,7 +65,7 @@ fn option_row() -> impl Widget<AppState> {
     let r1 = Flex::row()
         .with_child(open_button)
         .with_child(edit_button)
-        .with_child(save_button)
+        .with_child(scan_button)
         //.with_child(bookmark_button)
         .align_left();
 

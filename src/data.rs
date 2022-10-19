@@ -37,6 +37,7 @@ use winit::{
 use crate::build_ui;
 
 
+
 const SIZE_FONT: f64 = 20.0;
 
 //TODO: implemenatare una struttura che gestisca i capitolo secondo formattazione html v[0]="<p>Test<p>" v[1]="<img>....<img>"
@@ -278,11 +279,12 @@ impl AppState {
         data.scan_mode = true;
 
         let jpg = FileSpec::new("Jpg file", &["jpg"]);
+        let jpeg = FileSpec::new("Jpeg file", &["jpeg"]);
         let png = FileSpec::new("Png file", &["png"]);
         let default_save_name = String::from("MyFile.jpg");
 
         let save_dialog_options = FileDialogOptions::new()
-            .allowed_types(vec![jpg, png])
+            .allowed_types(vec![jpg, jpeg, png])
             .default_type(jpg)
             .default_name(default_save_name)
             .name_label("Target")
@@ -822,7 +824,6 @@ impl AppDelegate<AppState> for Delegate {
 
         if data.scan_mode{
             if let Some(file_info_scan) = cmd.get(commands::OPEN_FILE) {
-                println!("File selezionato: {}", file_info_scan.path().to_str().unwrap());
 
 
 
@@ -832,47 +833,70 @@ impl AppDelegate<AppState> for Delegate {
                         .output()
                         .expect("failed to execute process")
                 } else {
-                    std::process::Command::new("sh")
-                        .arg("-c")
-                        .arg("echo hello")
+                    std::process::Command::new("tesseract")
+                        .args([file_info_scan.path().to_str().unwrap(), "stdout"])
                         .output()
                         .expect("failed to execute process")
                 };
 
-                let hello = output.stdout;
-                let s = String::from_utf8(hello).unwrap();
+                let result = output.stdout;
+                let s = String::from_utf8(result).unwrap();
 
-                println!("Output: {} len: {}",s, s.len());
-                let mut count = 0;
-                let mut percentage = 0;
+                let mut count = 0.;
+                let mut percentage  = 0.;
                 let mut index = 0;
 
-
                 data.ebook.iter().enumerate().for_each(|(i, x)| {
+                    if i != 0 {
 
-                    if x.text.len() > 0 {
-                        for elem in s.split_whitespace() {
-                            println!("Elemento {}", elem);
-                            if x.text.contains(elem) && x.text.len() > 0 && elem._is_alphadigit() {
-                                count += 1;
-                                println!("Entro e modifica {}", count);
+                        if x.text.len() > 0 {
+                            let mut app = x.clone().text._strip_tags();
+                            for elem in s.split_whitespace() {
+
+                                let mut app2 : String = " ".to_string();
+                                app2.push_str(elem);
+                                app2.push_str(" ");
+
+                                if app.contains(&app2) && app.len() > 0 {
+
+                                    count += 1.;
+                                    app = app.replacen(&app2,"",1);
+                                }
                             }
 
-
+                            let temp: f64 = count / (count + app.split_whitespace().count() as f64);
+                            if temp > percentage {
+                                percentage = temp;
+                                index = i;
+                            }
+                            count = 0.;
                         }
-
-                        let temp = x.text._strip_tags().split_whitespace().count();
-
-                        if count / temp > percentage {
-                            percentage = count / temp;
-                            index = i;
-                        }
-                        count = 0;
                     }
 
                 });
 
-                println!("pagina trovata {}", index);
+                if percentage > 0.1{
+
+                    data.current_page=index;
+                    let mut res = "Research of the scanned page ended successfully, page found: ".to_string();
+                    res.push_str(data.current_page.to_string().as_str());
+
+                    let dialog = MessageDialog::new()
+                        .set_type(MessageType::Info)
+                        .set_text(res.as_str())
+                        .set_title("Page found")
+                        .show_alert();
+
+                }else {
+                    let mut res = "Research of the scanned page was not successfull, accuracy is too low".to_string();
+
+                    let dialog = MessageDialog::new()
+                        .set_type(MessageType::Warning)
+                        .set_text(res.as_str())
+                        .set_title("Page not found")
+                        .show_alert();
+                }
+
 
             }
         }

@@ -37,7 +37,6 @@ use winit::{
 use crate::build_ui;
 
 
-
 const SIZE_FONT: f64 = 20.0;
 
 //TODO: implemenatare una struttura che gestisca i capitolo secondo formattazione html v[0]="<p>Test<p>" v[1]="<img>....<img>"
@@ -100,6 +99,26 @@ impl Widget<AppState> for Rebuilder {
 
     fn update(&mut self, ctx: &mut UpdateCtx, old_data: &AppState, data: &AppState, _env: &Env) {
         if !old_data.same(data) {
+            if data.ebook.len() > 0 {
+                if old_data.edit_current_page != data.edit_current_page {
+                    if data.edit_current_page.parse::<usize>().is_ok() {
+                        if data.edit_current_page.parse::<usize>().unwrap() < data.ebook.len() {
+                            if data.edit_mode == false {
+                                if data.edit_current_page.len() == 0 {
+                                    ctx.submit_command(GO_TO_POS_FROM_EDIT.with(1));
+                                }else{
+                                    ctx.submit_command(GO_TO_POS_FROM_EDIT.with(data.edit_current_page.parse::<usize>().unwrap()));
+                                }
+
+                            }
+                        } else {
+                            if data.edit_mode == false {
+                                ctx.submit_command(GO_TO_POS_FROM_EDIT.with(data.ebook.len() - 1));
+                            }
+                        }
+                    }
+                }
+            }
             self.rebuild_inner(data);
             ctx.children_changed();
         }
@@ -202,6 +221,7 @@ pub struct AppState {
     pub current_page_text: String,
     pub file_info: String,
     pub scan_mode: bool,
+    pub edit_current_page: String,
 }
 
 impl AppState {
@@ -222,6 +242,7 @@ impl AppState {
             current_page_text: String::new(),
             file_info: String::new(),
             scan_mode: false,
+            edit_current_page: String::from("0"),
 
         }
     }
@@ -244,13 +265,13 @@ impl AppState {
     }
     pub fn click_edit_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         if data.ebook.len() == 0 {
-            let dialog = MessageDialog::new()
+            MessageDialog::new()
                 .set_type(MessageType::Info)
                 .set_text("Please select an Ebook to enable this function.")
                 .set_title("Ebook not selected")
                 .show_alert();
         } else if data.edit_mode {
-            let dialog = MessageDialog::new()
+            MessageDialog::new()
                 .set_type(MessageType::Warning)
                 .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
                 .set_title("Ebook in edit mode")
@@ -269,47 +290,61 @@ impl AppState {
                 .window_size(Size::new(1200., 700.));
 
             _ctx.new_window(new_win);
-
-            data.load_from_json();
         }
     }
 
 
-    pub fn click_save_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
-        data.scan_mode = true;
+    pub fn click_scan_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
 
-        let jpg = FileSpec::new("Jpg file", &["jpg"]);
-        let jpeg = FileSpec::new("Jpeg file", &["jpeg"]);
-        let png = FileSpec::new("Png file", &["png"]);
-        let default_save_name = String::from("MyFile.jpg");
+        if data.ebook.len() == 0 {
+            MessageDialog::new()
+                .set_type(MessageType::Info)
+                .set_text("Please select an Ebook to enable this function.")
+                .set_title("Ebook not selected")
+                .show_alert();
+        }
+        else if data.edit_mode == true {
+            MessageDialog::new()
+                .set_type(MessageType::Warning)
+                .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
+                .set_title("Ebook in edit mode")
+                .show_alert();
+        } else {
+            data.scan_mode = true;
 
-        let save_dialog_options = FileDialogOptions::new()
-            .allowed_types(vec![jpg, jpeg, png])
-            .default_type(jpg)
-            .default_name(default_save_name)
-            .name_label("Target")
-            .title("Choose a target for this lovely file")
-            .button_text("Export");
+            let jpg = FileSpec::new("Jpg file", &["jpg"]);
+            let jpeg = FileSpec::new("Jpeg file", &["jpeg"]);
+            let png = FileSpec::new("Png file", &["png"]);
+            let default_save_name = String::from("MyFile.jpg");
 
-        let open_dialog_options = save_dialog_options
-            .clone()
-            .default_name("MySavedFile.epub")
-            .name_label("Source")
-            .title("Where did you put that file?")
-            .button_text("Import");
+            let save_dialog_options = FileDialogOptions::new()
+                .allowed_types(vec![jpg, jpeg, png])
+                .default_type(jpg)
+                .default_name(default_save_name)
+                .name_label("Target")
+                .title("Choose a target for this lovely file")
+                .button_text("Export");
 
-        _ctx.submit_command(druid::commands::SHOW_OPEN_PANEL.with(open_dialog_options.clone()));
+            let open_dialog_options = save_dialog_options
+                .clone()
+                .default_name("MySavedFile.epub")
+                .name_label("Source")
+                .title("Where did you put that file?")
+                .button_text("Import");
+
+            _ctx.submit_command(druid::commands::SHOW_OPEN_PANEL.with(open_dialog_options.clone()));
+        }
     }
 
     pub fn click_bookmark_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         if data.ebook.len() == 0 {
-            let dialog = MessageDialog::new()
+            MessageDialog::new()
                 .set_type(MessageType::Info)
                 .set_text("Please select an Ebook to enable this function.")
                 .set_title("Ebook not selected")
                 .show_alert();
         } else if data.edit_mode {
-            let dialog = MessageDialog::new()
+            MessageDialog::new()
                 .set_type(MessageType::Warning)
                 .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
                 .set_title("Ebook in edit mode")
@@ -328,13 +363,13 @@ impl AppState {
 
     pub fn click_single_page_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         if data.ebook.len() == 0 {
-            let dialog = MessageDialog::new()
+            MessageDialog::new()
                 .set_type(MessageType::Info)
                 .set_text("Please select an Ebook to enable this function.")
                 .set_title("Ebook not selected")
                 .show_alert();
         } else if data.edit_mode {
-            let dialog = MessageDialog::new()
+            MessageDialog::new()
                 .set_type(MessageType::Warning)
                 .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
                 .set_title("Ebook in edit mode")
@@ -347,13 +382,13 @@ impl AppState {
 
     pub fn click_double_page_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         if data.ebook.len() == 0 {
-            let dialog = MessageDialog::new()
+            MessageDialog::new()
                 .set_type(MessageType::Info)
                 .set_text("Please select an Ebook to enable this function.")
                 .set_title("Ebook not selected")
                 .show_alert();
         } else if data.edit_mode {
-            let dialog = MessageDialog::new()
+            MessageDialog::new()
                 .set_type(MessageType::Warning)
                 .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
                 .set_title("Ebook in edit mode")
@@ -367,13 +402,13 @@ impl AppState {
     //TODO: Resettare il re
     pub fn click_previous_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         if data.ebook.len() == 0 {
-            let dialog = MessageDialog::new()
+            MessageDialog::new()
                 .set_type(MessageType::Info)
                 .set_text("Please select an Ebook to enable this function.")
                 .set_title("Ebook not selected")
                 .show_alert();
         } else if data.edit_mode {
-            let dialog = MessageDialog::new()
+            MessageDialog::new()
                 .set_type(MessageType::Warning)
                 .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
                 .set_title("Ebook in edit mode")
@@ -382,6 +417,8 @@ impl AppState {
             if data.double_page {
                 if data.current_page > 1 {
                     data.current_page -= 2;
+                    let new_page = data.current_page.to_string();
+                    data.edit_current_page = new_page;
                     data.saves.last_page = data.current_page;
                     //TODO: aggiornare anche i bookmarks
                     data.save_to_json();
@@ -389,6 +426,8 @@ impl AppState {
             } else {
                 if data.current_page > 0 {
                     data.current_page -= 1;
+                    let new_page = data.current_page.to_string();
+                    data.edit_current_page = new_page;
                     data.saves.last_page = data.current_page;
                     //TODO: aggiornare anche i bookmarks
                     data.save_to_json();
@@ -399,13 +438,13 @@ impl AppState {
 
     pub fn click_next_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         if data.ebook.len() == 0 {
-            let dialog = MessageDialog::new()
+            MessageDialog::new()
                 .set_type(MessageType::Info)
                 .set_text("Please select an Ebook to enable this function.")
                 .set_title("Ebook not selected")
                 .show_alert();
         } else if data.edit_mode {
-            let dialog = MessageDialog::new()
+            MessageDialog::new()
                 .set_type(MessageType::Warning)
                 .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
                 .set_title("Ebook in edit mode")
@@ -414,6 +453,8 @@ impl AppState {
             if data.double_page {
                 if data.current_page < (data.ebook.len() - 2) {
                     data.current_page += 2;
+                    let new_page = data.current_page.to_string();
+                    data.edit_current_page = new_page;
                     data.saves.last_page = data.current_page;
                     //TODO: aggiornare anche i bookmarks
                     data.save_to_json();
@@ -421,6 +462,8 @@ impl AppState {
             } else {
                 if data.current_page < (data.ebook.len() - 1) {
                     data.current_page += 1;
+                    let new_page = data.current_page.to_string();
+                    data.edit_current_page = new_page;
                     data.saves.last_page = data.current_page;
                     //TODO: aggiornare anche i bookmarks
                     data.save_to_json();
@@ -431,13 +474,13 @@ impl AppState {
 
     pub fn click_display_menu_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         if data.ebook.len() == 0 {
-            let dialog = MessageDialog::new()
+            MessageDialog::new()
                 .set_type(MessageType::Info)
                 .set_text("Please select an Ebook to enable this function.")
                 .set_title("Ebook not selected")
                 .show_alert();
         } else if data.edit_mode {
-            let dialog = MessageDialog::new()
+            MessageDialog::new()
                 .set_type(MessageType::Warning)
                 .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
                 .set_title("Ebook in edit mode")
@@ -449,20 +492,20 @@ impl AppState {
 
     pub fn click_confirm_bookmark_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         if data.ebook.len() == 0 {
-            let dialog = MessageDialog::new()
+            MessageDialog::new()
                 .set_type(MessageType::Info)
                 .set_text("Please select an Ebook to enable this function.")
                 .set_title("Ebook not selected")
                 .show_alert();
         } else if data.edit_mode {
-            let dialog = MessageDialog::new()
+            MessageDialog::new()
                 .set_type(MessageType::Warning)
                 .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
                 .set_title("Ebook in edit mode")
                 .show_alert();
         } else {
             if data.string_bookmark.len() == 0 {
-                let dialog = MessageDialog::new()
+                MessageDialog::new()
                     .set_type(MessageType::Warning)
                     .set_text("Please insert a title in order to create a new bookmark")
                     .set_title("No title for the bookmark")
@@ -479,7 +522,7 @@ impl AppState {
             }
 
             if found {
-                let dialog = MessageDialog::new()
+                MessageDialog::new()
                     .set_type(MessageType::Warning)
                     .set_text("You've already inserted a bookmark for this page")
                     .set_title("Bookmark already inserted")
@@ -495,13 +538,13 @@ impl AppState {
 
     pub fn click_reject_bookmark_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         if data.ebook.len() == 0 {
-            let dialog = MessageDialog::new()
+            MessageDialog::new()
                 .set_type(MessageType::Info)
                 .set_text("Please select an Ebook to enable this function.")
                 .set_title("Ebook not selected")
                 .show_alert();
         } else if data.edit_mode {
-            let dialog = MessageDialog::new()
+            MessageDialog::new()
                 .set_type(MessageType::Warning)
                 .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
                 .set_title("Ebook in edit mode")
@@ -540,6 +583,9 @@ impl AppState {
 
                 self.saves = u;
                 self.current_page = self.saves.last_page;
+
+                let new_page = self.current_page.to_string();
+                self.edit_current_page = new_page;
             }
             Err(_) => {}
         }
@@ -601,6 +647,7 @@ pub const GO_TO_POS: Selector<usize> = Selector::new("go_to_pos");
 pub const DELETE_BOOKMARK: Selector<(String, usize)> = Selector::new("delete_bookmark");
 pub const MODIFY_EDIT_MODE: Selector<bool> = Selector::new("modify_edit_mode");
 pub const SCAN_OCR_FILE: Selector<String> = Selector::new("scan_file");
+pub const GO_TO_POS_FROM_EDIT: Selector<usize> = Selector::new("edit_current_page");
 
 pub struct Delegate;
 
@@ -612,7 +659,7 @@ impl AppDelegate<AppState> for Delegate {
         env: &Env,
         ctx: &mut DelegateCtx<'_>,
     ) {
-        data.edit_mode = !data.edit_mode;
+        data.edit_mode = false;
     }
 
 
@@ -626,7 +673,7 @@ impl AppDelegate<AppState> for Delegate {
     ) -> Handled {
         if let Some(file_info) = cmd.get(commands::SAVE_FILE_AS) {
             if Path::new(file_info.path().to_str().unwrap()).exists() {
-                let dialog = MessageDialog::new()
+                MessageDialog::new()
                     .set_type(MessageType::Error)
                     .set_text("There is already an ebook with this name in this folder, try again with another name or change folder.")
                     .set_title("Ebook already exists")
@@ -655,39 +702,36 @@ impl AppDelegate<AppState> for Delegate {
                 let mut found_start_page = false;
                 let mut already_found = false;
                 let mut i_found = 0;
-                let mut next_stop_page= 0;
+                let mut next_stop_page = 0;
 
                 data.chapters.iter().enumerate().for_each(|(i, x)| {
-                    println!("I : {} current page {} target page {}", i, data.current_page, x.target_page);
+
 
                     if i == i_found {
                         next_stop_page = x.target_page;
                     }
 
-                    if found_start_page && stop_page == 0{
+                    if found_start_page && stop_page == 0 {
                         stop_page = x.target_page;
-                        println!("stop page: {}", stop_page);
                         found_start_page = false;
                     }
                     if x.target_page > data.current_page && !already_found {
-                        println!("Dentro maggiore");
                         current_chapter = i - 2;
                         start_page_chapter = last_initial_page;
                         stop_page = x.target_page;
                         found_start_page = true;
                         already_found = true;
-                        i_found = i+1;
+                        i_found = i + 1;
 
                         if !data.ebook[start_page_chapter].text.contains("<?xml") {
                             start_page_chapter -= 1;
                         }
                     } else if x.target_page == data.current_page && !already_found {
-                        println!("Dentro uguale");
                         current_chapter = i - 1;
                         start_page_chapter = x.target_page;
                         found_start_page = true;
                         already_found = true;
-                        i_found = i+1;
+                        i_found = i + 1;
 
                         if !data.ebook[start_page_chapter].text.contains("<?xml") {
                             start_page_chapter -= 1;
@@ -712,8 +756,6 @@ impl AppDelegate<AppState> for Delegate {
                             } else if i == stop_page - 1 {
                                 new_content.push_str(&data.current_page_text[..data.current_page_text.find("</html>").unwrap() + 7]);
                                 for j in i..next_stop_page {
-
-
                                     if j == i {
                                         next_content.push_str(&data.current_page_text[data.current_page_text.find("<?xml").unwrap()..]);
                                     } else if j == next_stop_page - 1 {
@@ -721,7 +763,6 @@ impl AppDelegate<AppState> for Delegate {
                                     } else {
                                         next_content.push_str(data.ebook[j].text.as_str());
                                     }
-
                                 }
                             } else {
                                 new_content.push_str(data.current_page_text.as_str());
@@ -737,11 +778,6 @@ impl AppDelegate<AppState> for Delegate {
                         }
                     }
                 }
-
-
-                println!("New Content {}", new_content);
-
-                //new_content = new_content[..new_content.find("</html").unwrap()+7].to_string();
 
                 let mut file_to_find = "h-".to_string();
                 file_to_find.push_str(current_chapter.to_string().as_str());
@@ -766,7 +802,7 @@ impl AppDelegate<AppState> for Delegate {
                             file_to_find = file.name().to_string();
                         }
 
-                        if file.name().contains(&file_to_find_next.clone()){
+                        if file.name().contains(&file_to_find_next.clone()) {
                             file_to_find_next = file.name().to_string();
                         }
 
@@ -785,8 +821,7 @@ impl AppDelegate<AppState> for Delegate {
                     }
                 }
 
-                if data.current_page == stop_page - 1 && !one_page{
-
+                if data.current_page == stop_page - 1 && !one_page {
                     let mut file_to_edit = dest_path.to_str().unwrap().to_string();
                     file_to_edit.push_str(file_to_find_next.as_str());
                     File::create(file_to_edit.clone());
@@ -794,7 +829,6 @@ impl AppDelegate<AppState> for Delegate {
                     let mut f2 = std::fs::OpenOptions::new().write(true).truncate(true).open(file_to_edit).unwrap();
                     f2.write_all(next_content.as_bytes()).unwrap();
                     f2.flush().unwrap();
-
                 }
 
                 let mut file_to_edit = dest_path.to_str().unwrap().to_string();
@@ -806,13 +840,11 @@ impl AppDelegate<AppState> for Delegate {
                 f2.flush().unwrap();
 
 
-
-
                 doit(dest_path.to_str().unwrap(), file_info.path().to_str().unwrap(), CompressionMethod::Bzip2);
                 let mut str = "File correctly saved at: ".to_string();
                 str.push_str(file_info.path().to_str().unwrap());
 
-                let dialog = MessageDialog::new()
+                MessageDialog::new()
                     .set_type(MessageType::Info)
                     .set_text(str.as_str())
                     .set_title("Success")
@@ -822,11 +854,8 @@ impl AppDelegate<AppState> for Delegate {
             }
         }
 
-        if data.scan_mode{
+        if data.scan_mode {
             if let Some(file_info_scan) = cmd.get(commands::OPEN_FILE) {
-
-
-
                 let output = if cfg!(target_os = "windows") {
                     std::process::Command::new("tesseract")
                         .args([file_info_scan.path().to_str().unwrap(), "stdout"])
@@ -843,24 +872,21 @@ impl AppDelegate<AppState> for Delegate {
                 let s = String::from_utf8(result).unwrap();
 
                 let mut count = 0.;
-                let mut percentage  = 0.;
+                let mut percentage = 0.;
                 let mut index = 0;
 
                 data.ebook.iter().enumerate().for_each(|(i, x)| {
                     if i != 0 {
-
                         if x.text.len() > 0 {
                             let mut app = x.clone().text._strip_tags();
                             for elem in s.split_whitespace() {
-
-                                let mut app2 : String = " ".to_string();
+                                let mut app2: String = " ".to_string();
                                 app2.push_str(elem);
                                 app2.push_str(" ");
 
                                 if app.contains(&app2) && app.len() > 0 {
-
                                     count += 1.;
-                                    app = app.replacen(&app2,"",1);
+                                    app = app.replacen(&app2, "", 1);
                                 }
                             }
 
@@ -872,35 +898,36 @@ impl AppDelegate<AppState> for Delegate {
                             count = 0.;
                         }
                     }
-
                 });
 
-                if percentage > 0.1{
-
-                    data.current_page=index;
+                if percentage > 0.1 {
+                    data.current_page = index;
                     let mut res = "Research of the scanned page ended successfully, page found: ".to_string();
                     res.push_str(data.current_page.to_string().as_str());
 
-                    let dialog = MessageDialog::new()
+                    MessageDialog::new()
                         .set_type(MessageType::Info)
                         .set_text(res.as_str())
                         .set_title("Page found")
                         .show_alert();
-
-                }else {
+                } else {
                     let mut res = "Research of the scanned page was not successfull, accuracy is too low".to_string();
 
-                    let dialog = MessageDialog::new()
+                    MessageDialog::new()
                         .set_type(MessageType::Warning)
                         .set_text(res.as_str())
                         .set_title("Page not found")
                         .show_alert();
                 }
-
-
             }
         }
 
+        if cmd.is(GO_TO_POS_FROM_EDIT) {
+            let pos = cmd.get_unchecked(GO_TO_POS_FROM_EDIT);
+            data.current_page = *pos;
+            data.edit_current_page = (*pos.to_string()).to_string();
+            data.save_to_json();
+        }
 
         if cmd.is(MODIFY_EDIT_MODE) {
             let pos = cmd.get_unchecked(MODIFY_EDIT_MODE);
@@ -910,6 +937,8 @@ impl AppDelegate<AppState> for Delegate {
         if cmd.is(GO_TO_POS) {
             let pos = cmd.get_unchecked(GO_TO_POS);
             data.current_page = *pos;
+            let new_page = data.current_page.to_string();
+            data.edit_current_page = new_page;
         }
 
         if cmd.is(DELETE_BOOKMARK) {
@@ -928,10 +957,10 @@ impl AppDelegate<AppState> for Delegate {
         }
 
 
-        if !data.scan_mode{
+        if !data.scan_mode {
             if let Some(file_info) = cmd.get(commands::OPEN_FILE) {
                 if data.edit_mode {
-                    let dialog = MessageDialog::new()
+                    MessageDialog::new()
                         .set_type(MessageType::Warning)
                         .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
                         .set_title("Ebook in edit mode")
@@ -951,6 +980,7 @@ impl AppDelegate<AppState> for Delegate {
 
                         data.ebook.clear();
                         data.current_page = 0;
+                        data.edit_current_page = String::from("0");
                         data.title = file_info.clone().path().to_str().unwrap().split("\\")
                             .last().unwrap().split(".")
                             .next().unwrap().to_string();
@@ -973,7 +1003,6 @@ impl AppDelegate<AppState> for Delegate {
 
                         for f in archive.files.clone() {
                             if f.contains("OEBPS") && (f.contains("htm.html") || f.contains("wrap")) {
-                                println!("File aperto {}", f);
                                 data.ebook.push_back(Page::new());
                                 if f.contains("wrap") {
                                     past_page_no = page_no;
@@ -1301,6 +1330,10 @@ impl AppDelegate<AppState> for Delegate {
                                     page_no = past_page_no;
                                 }
                             }
+                        }
+
+                        while data.ebook.last().unwrap().text.len() == 0 {
+                            data.ebook.pop_back();
                         }
                     }
                     Err(error) => {

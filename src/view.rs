@@ -56,21 +56,26 @@ fn option_row() -> impl Widget<AppState> {
 
     });
     let edit_button = Button::new("Edit").padding(5.0).on_click(AppState::click_edit_button);
-    let scan_button = Button::new("Scan").padding(5.0).on_click(AppState::click_save_button);
+    let scan_button = Button::new("Scan").padding(5.0).on_click(AppState::click_scan_button);
 
-    //let bookmark_button = Button::new("Bookmark").padding(5.0).on_click(AppState::click_bookmark_button);
+
+    let help_button = Button::new("Help").padding(5.0);
     let previous_button = Button::new("Previous Page").padding(5.0).on_click(AppState::click_previous_button);
+    let change_page = TextBox::new()
+        .with_placeholder("50")
+        .lens(AppState::edit_current_page);
     let next_button = Button::new("Next Page").padding(5.0).on_click(AppState::click_next_button);
 
     let r1 = Flex::row()
         .with_child(open_button)
         .with_child(edit_button)
         .with_child(scan_button)
-        //.with_child(bookmark_button)
+        .with_child(help_button)
         .align_left();
 
     let r2 = Flex::row()
         .with_child(previous_button)
+        .with_child(change_page)
         .with_child(next_button)
         .align_right();
 
@@ -96,6 +101,9 @@ fn settings_row() -> impl Widget<AppState> {
     let edit_size_text = TextBox::new()
         .with_placeholder("50")
         .lens(AppState::font_size);
+
+
+
     let r1 = Flex::row().with_child(display_menu_button).align_left();
     let r2 = Flex::row()
         .with_child(single_page_button)
@@ -177,6 +185,19 @@ fn option_row_edit_mode() -> impl Widget<AppState> {
         .border(Color::GRAY, 0.5)
 }
 
+pub fn check_valid_number(elem: String) -> String {
+    if elem.parse::<f64>().is_ok(){
+        if elem.parse::<f64>().unwrap().is_sign_positive() {
+            return "Ok".to_string();
+        }else {
+            return "Not valid".to_string();
+        }
+
+    }else{
+        return "Not valid".to_string();
+    }
+}
+
 //TODO: Aggiustare il controllo per la dimensione del font quando viene messa a 0 oppure cancellata dall'utente
 
 pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
@@ -201,18 +222,37 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
     // numero del capitolo, eventuali flag da usare
 
 
-    if state.ebook.len() > 0 && state.font_size.len() > 0 && state.font_size != "0"{
+
+    if state.ebook.len() > 0
+        && state.font_size != "0"
+        && state.edit_current_page.len() > 0
+        && check_valid_number(state.clone().edit_current_page) != "Not valid"
+        && state.edit_current_page._is_numeric() {
 
         if state.current_page != 0{
             let mut str_page_number = String::new();
             str_page_number.push_str((state.current_page).to_string().as_str());
             str_page_number.push_str("\n\n");
-            let rl_page = Label::new(str_page_number)
-                .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
-                .with_text_alignment(TextAlignment::Center)
-                .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size);
 
-            c.add_child(rl_page);
+            if state.font_size.len() > 0 && check_valid_number(state.font_size.clone()) == "Ok"{
+                let rl_page = Label::new(str_page_number)
+                    .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
+                    .with_text_alignment(TextAlignment::Center)
+                    .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size);
+
+                c.add_child(rl_page);
+            }else{
+                let rl_page = Label::new(str_page_number)
+                    .with_text_size(KeyOrValue::Concrete(1.))
+                    .with_text_alignment(TextAlignment::Center)
+                    .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size);
+
+                c.add_child(rl_page);
+            }
+
+
+
+
         }
 
 
@@ -246,13 +286,24 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
 
                         let mut img = Image::new(image_buf.clone()).fill_mode(FillStrat::Fill);
 
+                        if state.font_size.len() > 0 && check_valid_number(state.font_size.clone()) == "Ok"{
+                            let mut sized = SizedBox::new(img).fix_size(image_buf.width().clone() as f64 * (state.font_size.clone().parse::<f64>().unwrap() / 40.),
+                                                                        image_buf.height().clone() as f64 * (state.font_size.clone().parse::<f64>().unwrap() / 40.));
 
-                        let mut sized = SizedBox::new(img).fix_size(image_buf.width().clone() as f64 * (state.font_size.clone().parse::<f64>().unwrap() / 40.),
-                                                                    image_buf.height().clone() as f64 * (state.font_size.clone().parse::<f64>().unwrap() / 40.));
+                            let container = sized.border(Color::grey(0.6), 2.0).center().boxed();
+                            c.add_child(container);
+                        }
+                        else {
+                            let mut sized = SizedBox::new(img).fix_size(image_buf.width().clone() as f64 * (1. / 40.),
+                                                                        image_buf.height().clone() as f64 * (1. / 40.));
 
-                        let container = sized.border(Color::grey(0.6), 2.0).center().boxed();
+                            let container = sized.border(Color::grey(0.6), 2.0).center().boxed();
+                            c.add_child(container);
+                        }
 
-                        c.add_child(container);
+
+
+
                         i += 1;
                         pixels_vec.clear();
                     } else {
@@ -268,12 +319,21 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
 
                         _string = strip_tags(appStr.as_str());
 
+                        if state.font_size.len() > 0 && check_valid_number(state.font_size.clone()) == "Ok"{
+                            let rl = Label::new(_string.clone())
+                                .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
+                                .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size);
+                            c.add_child(rl);
+                        } else {
+                            let rl = Label::new(_string.clone())
+                                .with_text_size(KeyOrValue::Concrete(1.))
+                                .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size);
+                            c.add_child(rl);
+                        }
 
-                        let rl = Label::new(_string.clone())
-                            .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
-                            .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size);
 
-                        c.add_child(rl);
+
+
                     }
                 }
             }
@@ -304,13 +364,23 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
 
                     let mut img = Image::new(image_buf.clone()).fill_mode(FillStrat::Fill);
 
+                    if state.font_size.len() > 0 && check_valid_number(state.font_size.clone()) == "Ok"{
+                        let mut sized = SizedBox::new(img).fix_size(image_buf.width().clone() as f64 * (state.font_size.clone().parse::<f64>().unwrap() / 40.),
+                                                                    image_buf.height().clone() as f64 * (state.font_size.clone().parse::<f64>().unwrap() / 40.));
 
-                    let mut sized = SizedBox::new(img).fix_size(image_buf.width().clone() as f64 * (state.font_size.clone().parse::<f64>().unwrap() / 40.),
-                                                                image_buf.height().clone() as f64 * (state.font_size.clone().parse::<f64>().unwrap() / 40.));
+                        let container = sized.border(Color::grey(0.6), 2.0).center().boxed();
 
-                    let container = sized.border(Color::grey(0.6), 2.0).center().boxed();
+                        c.add_child(container);
+                    }else {
+                        let mut sized = SizedBox::new(img).fix_size(image_buf.width().clone() as f64 * (1. / 40.),
+                                                                    image_buf.height().clone() as f64 * (1. / 40.));
 
-                    c.add_child(container);
+                        let container = sized.border(Color::grey(0.6), 2.0).center().boxed();
+
+                        c.add_child(container);
+                    }
+
+
                     i += 1;
                     pixels_vec.clear();
                 } else {
@@ -326,12 +396,20 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
 
                     _string = strip_tags(appStr.as_str());
 
+                    if state.font_size.len() > 0 && check_valid_number(state.font_size.clone()) == "Ok"{
+                        let rl = Label::new(_string.clone())
+                            .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
+                            .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size);
 
-                    let rl = Label::new(_string.clone())
-                        .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
-                        .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size);
+                        c.add_child(rl);
+                    } else {
+                        let rl = Label::new(_string.clone())
+                            .with_text_size(KeyOrValue::Concrete(1.))
+                            .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size);
 
-                    c.add_child(rl);
+                        c.add_child(rl);
+                    }
+
                 }
             }
         }else{
@@ -360,13 +438,23 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
 
                     let mut img = Image::new(image_buf.clone()).fill_mode(FillStrat::Fill);
 
+                    if state.font_size.len() > 0 && check_valid_number(state.font_size.clone()) == "Ok"{
+                        let mut sized = SizedBox::new(img).fix_size(image_buf.width().clone() as f64 * (state.font_size.clone().parse::<f64>().unwrap() / 40.),
+                                                                    image_buf.height().clone() as f64 * (state.font_size.clone().parse::<f64>().unwrap() / 40.));
 
-                    let mut sized = SizedBox::new(img).fix_size(image_buf.width().clone() as f64 * (state.font_size.clone().parse::<f64>().unwrap() / 40.),
-                                                                image_buf.height().clone() as f64 * (state.font_size.clone().parse::<f64>().unwrap() / 40.));
+                        let container = sized.border(Color::grey(0.6), 2.0).center().boxed();
 
-                    let container = sized.border(Color::grey(0.6), 2.0).center().boxed();
+                        c.add_child(container);
+                    } else {
+                        let mut sized = SizedBox::new(img).fix_size(image_buf.width().clone() as f64 * (1. / 40.),
+                                                                    image_buf.height().clone() as f64 * (1. / 40.));
 
-                    c.add_child(container);
+                        let container = sized.border(Color::grey(0.6), 2.0).center().boxed();
+
+                        c.add_child(container);
+                    }
+
+
                     i += 1;
                     pixels_vec.clear();
                 } else {
@@ -382,12 +470,20 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
 
                     _string = strip_tags(appStr.as_str());
 
+                    if state.font_size.len() > 0 && check_valid_number(state.font_size.clone()) == "Ok"{
+                        let rl = Label::new(_string.clone())
+                            .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
+                            .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size);
 
-                    let rl = Label::new(_string.clone())
-                        .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
-                        .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size);
+                        c.add_child(rl);
+                    }else {
+                        let rl = Label::new(_string.clone())
+                            .with_text_size(KeyOrValue::Concrete(1.))
+                            .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size);
 
-                    c.add_child(rl);
+                        c.add_child(rl);
+                    }
+
                 }
             }
         }
@@ -398,12 +494,22 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
                     let mut str_page = String::new();
                     str_page.push_str((state.current_page + 1).to_string().as_str());
                     str_page.push_str("\n\n");
+                if state.font_size.len() > 0 && check_valid_number(state.font_size.clone()) == "Ok"{
                     let rl_page = Label::new(str_page)
                         .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
                         .with_text_alignment(TextAlignment::Center)
                         .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size);
 
                     c2.add_child(rl_page);
+                } else {
+                    let rl_page = Label::new(str_page)
+                        .with_text_size(KeyOrValue::Concrete(1.))
+                        .with_text_alignment(TextAlignment::Center)
+                        .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size);
+
+                    c2.add_child(rl_page);
+                }
+
 
 
                 let init_double = state.ebook[state.current_page + 1].text.find("<body");
@@ -433,13 +539,23 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
 
                             let mut img = Image::new(image_buf.clone()).fill_mode(FillStrat::Fill);
 
+                            if state.font_size.len() > 0 && check_valid_number(state.font_size.clone()) == "Ok"{
+                                let mut sized = SizedBox::new(img).fix_size(image_buf.width().clone() as f64 * (state.font_size.clone().parse::<f64>().unwrap() / 40.),
+                                                                            image_buf.height().clone() as f64 * (state.font_size.clone().parse::<f64>().unwrap() / 40.));
 
-                            let mut sized = SizedBox::new(img).fix_size(image_buf.width().clone() as f64 * (state.font_size.clone().parse::<f64>().unwrap() / 40.),
-                                                                        image_buf.height().clone() as f64 * (state.font_size.clone().parse::<f64>().unwrap() / 40.));
+                                let container = sized.border(Color::grey(0.6), 2.0).center().boxed();
 
-                            let container = sized.border(Color::grey(0.6), 2.0).center().boxed();
+                                c2.add_child(container);
+                            } else {
+                                let mut sized = SizedBox::new(img).fix_size(image_buf.width().clone() as f64 * (1. / 40.),
+                                                                            image_buf.height().clone() as f64 * (1. / 40.));
 
-                            c2.add_child(container);
+                                let container = sized.border(Color::grey(0.6), 2.0).center().boxed();
+
+                                c2.add_child(container);
+                            }
+
+
                             i += 1;
                             pixels_vec.clear();
                         } else {
@@ -455,12 +571,21 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
 
                             _string = strip_tags(appStr.as_str());
 
+                            if state.font_size.len() > 0 && check_valid_number(state.font_size.clone()) == "Ok"{
+                                let rl = Label::new(_string.clone())
+                                    .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
+                                    .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size);
 
-                            let rl = Label::new(_string.clone())
-                                .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
-                                .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size);
+                                c2.add_child(rl);
+                            } else {
+                                let rl = Label::new(_string.clone())
+                                    .with_text_size(KeyOrValue::Concrete(1.))
+                                    .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size);
 
-                            c2.add_child(rl);
+                                c2.add_child(rl);
+                            }
+
+
                         }
                     }
                 }else{
@@ -488,13 +613,23 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
 
                             let mut img = Image::new(image_buf.clone()).fill_mode(FillStrat::Fill);
 
+                            if state.font_size.len() > 0 && check_valid_number(state.font_size.clone()) == "Ok"{
+                                let mut sized = SizedBox::new(img).fix_size(image_buf.width().clone() as f64 * (state.font_size.clone().parse::<f64>().unwrap() / 40.),
+                                                                            image_buf.height().clone() as f64 * (state.font_size.clone().parse::<f64>().unwrap() / 40.));
 
-                            let mut sized = SizedBox::new(img).fix_size(image_buf.width().clone() as f64 * (state.font_size.clone().parse::<f64>().unwrap() / 40.),
-                                                                        image_buf.height().clone() as f64 * (state.font_size.clone().parse::<f64>().unwrap() / 40.));
+                                let container = sized.border(Color::grey(0.6), 2.0).center().boxed();
 
-                            let container = sized.border(Color::grey(0.6), 2.0).center().boxed();
+                                c2.add_child(container);
+                            } else {
+                                let mut sized = SizedBox::new(img).fix_size(image_buf.width().clone() as f64 * (1. / 40.),
+                                                                            image_buf.height().clone() as f64 * (1. / 40.));
 
-                            c2.add_child(container);
+                                let container = sized.border(Color::grey(0.6), 2.0).center().boxed();
+
+                                c2.add_child(container);
+                            }
+
+
                             i += 1;
                             pixels_vec.clear();
                         } else {
@@ -510,12 +645,21 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
 
                             _string = strip_tags(appStr.as_str());
 
+                            if state.font_size.len() > 0 && check_valid_number(state.font_size.clone()) == "Ok"{
+                                let rl = Label::new(_string.clone())
+                                    .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
+                                    .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size);
 
-                            let rl = Label::new(_string.clone())
-                                .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
-                                .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size);
+                                c2.add_child(rl);
+                            }else {
+                                let rl = Label::new(_string.clone())
+                                    .with_text_size(KeyOrValue::Concrete(1.))
+                                    .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size);
 
-                            c2.add_child(rl);
+                                c2.add_child(rl);
+                            }
+
+
                         }
                     }
                 }
@@ -527,55 +671,117 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
 
     if state.double_page {
         let mut c3 = Flex::row();
-        if state.display_menu && state.font_size.len() > 0 && state.font_size != "0"{
+        if state.display_menu && state.font_size != "0"{
             let mut c4 = Flex::column();
-            c4.add_child(Padding::new((0., 10.), Label::new("BOOKMARKS")
-                .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
-                .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size)));
 
-            //TODO: togliere il cliccabile negli spazi tra i capitoli
-
+            if state.font_size.len() > 0 && check_valid_number(state.font_size.clone()) == "Ok"{
+                c4.add_child(Padding::new((0., 10.), Label::new("BOOKMARKS")
+                    .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
+                    .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size)));
+            } else {
+                c4.add_child(Padding::new((0., 10.), Label::new("BOOKMARKS")
+                    .with_text_size(KeyOrValue::Concrete(1.))
+                    .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size)));
+            }
 
             if state.saves.bookmarks.len() > 0 {
                 for bookmark in state.saves.bookmarks.clone() {
                     let mut ro = Flex::row();
 
-                    let mut ch = ControllerHost::new(Label::new(bookmark.0.clone() + " - pag. " + (bookmark.1.clone()).to_string().as_str())
+                    if state.font_size.len() > 0 && check_valid_number(state.font_size.clone()) == "Ok"{
+                        let mut ch = ControllerHost::new(Label::new(bookmark.0.clone() + " - pag. " + (bookmark.1.clone()).to_string().as_str())
+                                                             .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
+                                                             .with_text_color(KeyOrValue::Concrete(Color::LIME))
+                                                             .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size), Click::new(move |ctx, data, env| {
+                            ctx.submit_command(GO_TO_POS.with(bookmark.1.clone()));
+                        }));
+
+                        ro.add_flex_child(ch, 1.0);
+                    } else {
+                        let mut ch = ControllerHost::new(Label::new(bookmark.0.clone() + " - pag. " + (bookmark.1.clone()).to_string().as_str())
+                                                             .with_text_size(KeyOrValue::Concrete(1.))
+                                                             .with_text_color(KeyOrValue::Concrete(Color::LIME))
+                                                             .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size), Click::new(move |ctx, data, env| {
+                            ctx.submit_command(GO_TO_POS.with(bookmark.1.clone()));
+                        }));
+
+                        ro.add_flex_child(ch, 1.0);
+                    }
+
+
+
+                    if state.font_size.len() > 0 && check_valid_number(state.font_size.clone()) == "Ok"{
+                        let x_button = Label::new("x")
+                            .with_text_color(KeyOrValue::Concrete(Color::RED))
+                            .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
+                            .on_click(move |ctx, data, env| {
+                                ctx.submit_command(DELETE_BOOKMARK.with(bookmark.clone()));
+                            });
+
+                        ro.add_flex_child(x_button, 0.6);
+                        c4.add_child(ro);
+                    } else {
+                        let x_button = Label::new("x")
+                            .with_text_color(KeyOrValue::Concrete(Color::RED))
+                            .with_text_size(KeyOrValue::Concrete(1.))
+                            .on_click(move |ctx, data, env| {
+                                ctx.submit_command(DELETE_BOOKMARK.with(bookmark.clone()));
+                            });
+
+                        ro.add_flex_child(x_button, 0.6);
+                        c4.add_child(ro);
+                    }
+
+
+                }
+            } else {
+
+                if state.font_size.len() > 0 && check_valid_number(state.font_size.clone()) == "Ok"{
+                    c4.add_child(Padding::new((0., 10.), Label::new("No bookmarks available")
+                        .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
+                        .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size)));
+                } else {
+                    c4.add_child(Padding::new((0., 10.), Label::new("No bookmarks available")
+                        .with_text_size(KeyOrValue::Concrete(1.))
+                        .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size)));
+                }
+
+
+            }
+
+            if state.font_size.len() > 0 && check_valid_number(state.font_size.clone()) == "Ok"{
+                c4.add_child(Padding::new((0., 20.), Label::new("CHAPTERS")
+                    .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
+                    .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size)));
+            } else {
+                c4.add_child(Padding::new((0., 20.), Label::new("CHAPTERS")
+                    .with_text_size(KeyOrValue::Concrete(1.))
+                    .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size)));
+            }
+
+
+            for chapter in state.chapters.clone() {
+
+                if state.font_size.len() > 0 && check_valid_number(state.font_size.clone()) == "Ok"{
+                    c4.add_child(ControllerHost::new(Label::new(chapter.title.clone())
                                                          .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
                                                          .with_text_color(KeyOrValue::Concrete(Color::LIME))
                                                          .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size), Click::new(move |ctx, data, env| {
-                        ctx.submit_command(GO_TO_POS.with(bookmark.1.clone()));
-                    }));
-
-                    ro.add_flex_child(ch, 1.0);
-
-
-                    let x_button = Label::new("x")
-                        .with_text_color(KeyOrValue::Concrete(Color::RED))
-                        .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
-                        .on_click(move |ctx, data, env| {
-                            ctx.submit_command(DELETE_BOOKMARK.with(bookmark.clone()));
-                        });
-
-                    ro.add_flex_child(x_button, 0.6);
-                    c4.add_child(ro);
+                        ctx.submit_command(GO_TO_POS.with(chapter.target_page.clone()));
+                    })));
+                    c4.add_child(Label::new("\n"));
                 }
-            } else {
-                c4.add_child(Padding::new((0., 10.), Label::new("No bookmarks available")
-                    .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
-                    .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size)));
-            }
-            c4.add_child(Padding::new((0., 20.), Label::new("CHAPTERS")
-                .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
-                .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size)));
-            for chapter in state.chapters.clone() {
-                c4.add_child(ControllerHost::new(Label::new(chapter.title.clone())
-                                                     .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
-                                                     .with_text_color(KeyOrValue::Concrete(Color::LIME))
-                                                     .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size), Click::new(move |ctx, data, env| {
-                    ctx.submit_command(GO_TO_POS.with(chapter.target_page.clone()));
-                })));
-                c4.add_child(Label::new("\n"));
+                else {
+                    c4.add_child(ControllerHost::new(Label::new(chapter.title.clone())
+                                                         .with_text_size(KeyOrValue::Concrete(1.))
+                                                         .with_text_color(KeyOrValue::Concrete(Color::LIME))
+                                                         .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size), Click::new(move |ctx, data, env| {
+                        ctx.submit_command(GO_TO_POS.with(chapter.target_page.clone()));
+                    })));
+                    c4.add_child(Label::new("\n"));
+                }
+
+
             }
             c3.add_flex_child(c4, 0.2);
             let padd = Padding::new((30., 0.), c.cross_axis_alignment(CrossAxisAlignment::Start));
@@ -589,11 +795,20 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
         scroll = Scroll::new(c3.cross_axis_alignment(CrossAxisAlignment::Start)).vertical();
     } else {
         let mut c3 = Flex::row();
-        if state.display_menu && state.font_size.len() > 0 && state.font_size != "0" {
+        if state.display_menu && state.font_size != "0" {
             let mut c4 = Flex::column();
-            c4.add_child(Padding::new((0., 10.), Label::new("BOOKMARKS")
-                .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
-                .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size)));
+
+            if state.font_size.len() > 0 && check_valid_number(state.font_size.clone()) == "Ok"{
+                c4.add_child(Padding::new((0., 10.), Label::new("BOOKMARKS")
+                    .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
+                    .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size)));
+            } else {
+                c4.add_child(Padding::new((0., 10.), Label::new("BOOKMARKS")
+                    .with_text_size(KeyOrValue::Concrete(1.))
+                    .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size)));
+            }
+
+
 
             //TODO: togliere il cliccabile negli spazi tra i capitoli
 
@@ -601,43 +816,100 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
                 for bookmark in state.saves.bookmarks.clone() {
                     let mut ro = Flex::row();
 
-                    let mut ch = ControllerHost::new(Label::new(bookmark.0.clone() + " - pag. " + (bookmark.1.clone() + 1).to_string().as_str())
+                    if state.font_size.len() > 0 && check_valid_number(state.font_size.clone()) == "Ok"{
+                        let mut ch = ControllerHost::new(Label::new(bookmark.0.clone() + " - pag. " + (bookmark.1.clone() + 1).to_string().as_str())
+                                                             .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
+                                                             .with_text_color(KeyOrValue::Concrete(Color::LIME))
+                                                             .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size), Click::new(move |ctx, data, env| {
+                            ctx.submit_command(GO_TO_POS.with(bookmark.1.clone()));
+                        }));
+
+                        ro.add_flex_child(ch, 1.0);
+                    } else {
+                        let mut ch = ControllerHost::new(Label::new(bookmark.0.clone() + " - pag. " + (bookmark.1.clone() + 1).to_string().as_str())
+                                                             .with_text_size(KeyOrValue::Concrete(1.))
+                                                             .with_text_color(KeyOrValue::Concrete(Color::LIME))
+                                                             .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size), Click::new(move |ctx, data, env| {
+                            ctx.submit_command(GO_TO_POS.with(bookmark.1.clone()));
+                        }));
+
+                        ro.add_flex_child(ch, 1.0);
+                    }
+
+
+                    if state.font_size.len() > 0 && check_valid_number(state.font_size.clone()) == "Ok"{
+                        let x_button = Label::new("x")
+                            .with_text_color(KeyOrValue::Concrete(Color::RED))
+                            .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
+                            .on_click(move |ctx, data, env| {
+                                ctx.submit_command(DELETE_BOOKMARK.with(bookmark.clone()));
+                            });
+
+                        ro.add_flex_child(x_button, 0.5);
+                        c4.add_child(ro);
+                    } else {
+                        let x_button = Label::new("x")
+                            .with_text_color(KeyOrValue::Concrete(Color::RED))
+                            .with_text_size(KeyOrValue::Concrete(1.))
+                            .on_click(move |ctx, data, env| {
+                                ctx.submit_command(DELETE_BOOKMARK.with(bookmark.clone()));
+                            });
+
+                        ro.add_flex_child(x_button, 0.5);
+                        c4.add_child(ro);
+                    }
+
+
+                }
+            } else {
+
+                if state.font_size.len() > 0 && state.font_size.clone().parse::<f64>().is_ok(){
+                    c4.add_child(Padding::new((0., 10.), Label::new("No bookmarks available")
+                        .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
+                        .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size)));
+                }else{
+                    c4.add_child(Padding::new((0., 10.), Label::new("No bookmarks available")
+                        .with_text_size(KeyOrValue::Concrete(1.))
+                        .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size)));
+                }
+
+
+            }
+
+            if state.font_size.len() > 0 && check_valid_number(state.font_size.clone()) == "Ok"{
+                c4.add_child(Padding::new((0., 20.), Label::new("CHAPTERS")
+                    .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
+                    .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size)));
+            } else {
+                c4.add_child(Padding::new((0., 10.), Label::new("No bookmarks available")
+                    .with_text_size(KeyOrValue::Concrete(1.))
+                    .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size)));
+            }
+
+
+            for chapter in state.chapters.clone() {
+
+                if state.font_size.len() > 0 && check_valid_number(state.font_size.clone()) == "Ok"{
+                    c4.add_child(ControllerHost::new(Label::new(chapter.title.clone())
                                                          .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
                                                          .with_text_color(KeyOrValue::Concrete(Color::LIME))
                                                          .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size), Click::new(move |ctx, data, env| {
-                        ctx.submit_command(GO_TO_POS.with(bookmark.1.clone()));
-                    }));
+                        ctx.submit_command(GO_TO_POS.with(chapter.target_page.clone()));
+                    })));
 
-                    ro.add_flex_child(ch, 1.0);
+                    c4.add_child(Label::new("\n"));
+                } else {
+                    c4.add_child(ControllerHost::new(Label::new(chapter.title.clone())
+                                                         .with_text_size(KeyOrValue::Concrete(1.))
+                                                         .with_text_color(KeyOrValue::Concrete(Color::LIME))
+                                                         .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size), Click::new(move |ctx, data, env| {
+                        ctx.submit_command(GO_TO_POS.with(chapter.target_page.clone()));
+                    })));
 
-
-                    let x_button = Label::new("x")
-                        .with_text_color(KeyOrValue::Concrete(Color::RED))
-                        .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
-                        .on_click(move |ctx, data, env| {
-                            ctx.submit_command(DELETE_BOOKMARK.with(bookmark.clone()));
-                        });
-
-                    ro.add_flex_child(x_button, 0.5);
-                    c4.add_child(ro);
+                    c4.add_child(Label::new("\n"));
                 }
-            } else {
-                c4.add_child(Padding::new((0., 10.), Label::new("No bookmarks available")
-                    .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
-                    .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size)));
-            }
-            c4.add_child(Padding::new((0., 20.), Label::new("CHAPTERS")
-                .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
-                .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size)));
-            for chapter in state.chapters.clone() {
-                c4.add_child(ControllerHost::new(Label::new(chapter.title.clone())
-                                                     .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
-                                                     .with_text_color(KeyOrValue::Concrete(Color::LIME))
-                                                     .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size), Click::new(move |ctx, data, env| {
-                    ctx.submit_command(GO_TO_POS.with(chapter.target_page.clone()));
-                })));
 
-                c4.add_child(Label::new("\n"));
+
             }
             c3.add_flex_child(c4, 0.2);
             let padd = Padding::new((20., 0.), c.cross_axis_alignment(CrossAxisAlignment::Start));

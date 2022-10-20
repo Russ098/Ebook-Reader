@@ -1,40 +1,25 @@
-use std::error::Error;
+#![allow(deprecated)]
+#![allow(unused_assignments)]
+
 use std::{fs, io};
-use druid::{Data, Lens, EventCtx, Env, ArcStr, KeyOrValue, FontFamily, commands, AppDelegate, DelegateCtx, Target, Command, Handled, ImageBuf, Widget, WidgetExt, Event, LifeCycleCtx, LifeCycle, UpdateCtx, LayoutCtx, BoxConstraints, Size, PaintCtx, WidgetId, WindowHandle, LensExt, Selector, WindowDesc, AppLauncher, FileInfo, WindowId, FileDialogOptions, FileSpec};
-use druid::text::{RichText, Attribute};
-use epub::doc::EpubDoc;
-use std::fs::{DirEntry, File};
+use druid::{Data, Lens, EventCtx, Env, commands, AppDelegate, DelegateCtx, Target, Command, Handled, Widget, WidgetExt, Event, LifeCycleCtx, LifeCycle, UpdateCtx, LayoutCtx, BoxConstraints, Size, PaintCtx, WidgetId, Selector, WindowDesc,  WindowId, FileDialogOptions, FileSpec};
+use std::fs::{File};
 use std::io::{BufReader, Read, Seek, Write};
-use std::iter::Zip;
 use std::path::{Path, PathBuf};
-use std::process::exit;
-use std::str::from_utf8;
-use druid::commands::CLOSE_WINDOW;
-use druid::Event::WindowSize;
 use druid::im::Vector;
-use druid::widget::{Image, SizedBox};
+use druid::widget::{SizedBox};
 use epub::archive::EpubArchive;
-use imagesize::{size, ImageSize, blob_size};
-use druid::piet::ImageFormat;
-use druid::platform_menus::win::file::new;
-use image::imageops::resize;
+use imagesize::{blob_size};
 use native_dialog::{MessageDialog, MessageType};
 use voca_rs::Voca;
 use crate::view::{build_ui_edit_mode, build_widget};
 use serde::Serialize;
 use serde::Deserialize;
-use serde_json::json;
 use voca_rs::strip::strip_tags;
-use zip::{CompressionMethod, ZipArchive, ZipWriter};
+use zip::{CompressionMethod};
 use zip::result::ZipError;
 use zip::write::FileOptions;
 use walkdir::{WalkDir, DirEntry as OtherDirEntry};
-use winit::{
-    event::{Event as Other_Event, WindowEvent},
-    event_loop::EventLoop,
-    window::WindowBuilder,
-};
-use crate::build_ui;
 
 
 const SIZE_FONT: f64 = 20.0;
@@ -48,13 +33,6 @@ pub struct ImageOfPage {
 }
 
 impl ImageOfPage {
-    pub fn new() -> Self {
-        Self {
-            image: Vector::new(),
-            width: 0,
-            height: 0,
-        }
-    }
     pub fn from(image: Vector<u8>, width: usize, height: usize) -> Self {
         Self {
             image,
@@ -84,7 +62,7 @@ impl Rebuilder {
 
 impl Widget<AppState> for Rebuilder {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut AppState, env: &Env) {
-        if (data.window_size != self.window_size) {
+        if data.window_size != self.window_size {
             data.window_size = self.window_size;
         }
         self.inner.event(ctx, event, data, env)
@@ -157,13 +135,6 @@ impl Page {
             images: Vector::<ImageOfPage>::new(),
         }
     }
-
-    pub fn load_params(txt: String, imgs: Vector<ImageOfPage>) -> Self {
-        Self {
-            text: txt,
-            images: imgs,
-        }
-    }
 }
 
 #[derive(Clone, Data, Serialize, Deserialize)]
@@ -173,13 +144,6 @@ pub struct Chapter {
 }
 
 impl Chapter {
-    pub fn new() -> Self {
-        Self {
-            title: String::new(),
-            target_page: 0,
-        }
-    }
-
     pub fn from(title: String, page: usize) -> Self {
         Self {
             title: String::from(title),
@@ -189,12 +153,12 @@ impl Chapter {
 }
 
 #[derive(Clone, Data, Serialize, Deserialize)]
-pub struct Json_struct {
+pub struct JsonStruct {
     pub bookmarks: Vector<(String, usize)>,
     pub last_page: usize,
 }
 
-impl Json_struct {
+impl JsonStruct {
     pub fn new() -> Self {
         Self {
             bookmarks: Vector::new(),
@@ -213,7 +177,7 @@ pub struct AppState {
     pub double_page: bool,
     pub title: String,
     pub chapters: Vector<Chapter>,
-    pub saves: Json_struct,
+    pub saves: JsonStruct,
     pub edit_mode: bool,
     pub display_menu: bool,
     pub new_bookmark: bool,
@@ -234,7 +198,7 @@ impl AppState {
             double_page: false,
             title: String::new(),
             chapters: Vector::<Chapter>::new(),
-            saves: Json_struct::new(),
+            saves: JsonStruct::new(),
             edit_mode: false,
             display_menu: false,
             new_bookmark: false,
@@ -269,13 +233,13 @@ impl AppState {
                 .set_type(MessageType::Info)
                 .set_text("Please select an Ebook to enable this function.")
                 .set_title("Ebook not selected")
-                .show_alert();
+                .show_alert().expect("Error while trying to open an Ebook");
         } else if data.edit_mode {
             MessageDialog::new()
                 .set_type(MessageType::Warning)
                 .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
                 .set_title("Ebook in edit mode")
-                .show_alert();
+                .show_alert().expect("Error while showing warning when the app is in EDIT MODE");
         } else {
             //TODO: Fare la vera funzione
 
@@ -301,14 +265,14 @@ impl AppState {
                 .set_type(MessageType::Info)
                 .set_text("Please select an Ebook to enable this function.")
                 .set_title("Ebook not selected")
-                .show_alert();
+                .show_alert().expect("Error while selecting an Ebook");
         }
         else if data.edit_mode == true {
             MessageDialog::new()
                 .set_type(MessageType::Warning)
                 .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
                 .set_title("Ebook in edit mode")
-                .show_alert();
+                .show_alert().expect("Error while selecting an Ebook and the app is in EDIT MODE");
         } else {
             data.scan_mode = true;
 
@@ -342,13 +306,13 @@ impl AppState {
                 .set_type(MessageType::Info)
                 .set_text("Please select an Ebook to enable this function.")
                 .set_title("Ebook not selected")
-                .show_alert();
+                .show_alert().expect("Error whle selecting an Ebook");
         } else if data.edit_mode {
             MessageDialog::new()
                 .set_type(MessageType::Warning)
                 .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
                 .set_title("Ebook in edit mode")
-                .show_alert();
+                .show_alert().expect("Error while selecting an Ebook but the app is in EDIT MODE");
         } else {
             /*
                         data.saves.last_page = data.current_page;
@@ -367,13 +331,13 @@ impl AppState {
                 .set_type(MessageType::Info)
                 .set_text("Please select an Ebook to enable this function.")
                 .set_title("Ebook not selected")
-                .show_alert();
+                .show_alert().expect("Error while selecting an Ebook");
         } else if data.edit_mode {
             MessageDialog::new()
                 .set_type(MessageType::Warning)
                 .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
                 .set_title("Ebook in edit mode")
-                .show_alert();
+                .show_alert().expect("Error while selecting an Ebook but the app is in EDIT MODE");
         } else {
             //TODO: Fare la vera funzione
             data.double_page = false;
@@ -386,13 +350,13 @@ impl AppState {
                 .set_type(MessageType::Info)
                 .set_text("Please select an Ebook to enable this function.")
                 .set_title("Ebook not selected")
-                .show_alert();
+                .show_alert().expect("Error while selecting an Ebook");
         } else if data.edit_mode {
             MessageDialog::new()
                 .set_type(MessageType::Warning)
                 .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
                 .set_title("Ebook in edit mode")
-                .show_alert();
+                .show_alert().expect("Error while selecting an Ebook but the app is in EDIT MODE");
         } else {
             //TODO: Fare la vera funzione
             data.double_page = true;
@@ -406,13 +370,13 @@ impl AppState {
                 .set_type(MessageType::Info)
                 .set_text("Please select an Ebook to enable this function.")
                 .set_title("Ebook not selected")
-                .show_alert();
+                .show_alert().expect("Error while selecting an Ebook");
         } else if data.edit_mode {
             MessageDialog::new()
                 .set_type(MessageType::Warning)
                 .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
                 .set_title("Ebook in edit mode")
-                .show_alert();
+                .show_alert().expect("Error while selecting an Ebook but the app is in EDIT MODE");
         } else {
             if data.double_page {
                 if data.current_page > 1 {
@@ -442,13 +406,13 @@ impl AppState {
                 .set_type(MessageType::Info)
                 .set_text("Please select an Ebook to enable this function.")
                 .set_title("Ebook not selected")
-                .show_alert();
+                .show_alert().expect("Error while selecting an Ebook");
         } else if data.edit_mode {
             MessageDialog::new()
                 .set_type(MessageType::Warning)
                 .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
                 .set_title("Ebook in edit mode")
-                .show_alert();
+                .show_alert().expect("Error while selecting an Ebook but the app is in EDIT MODE");
         } else {
             if data.double_page {
                 if data.current_page < (data.ebook.len() - 2) {
@@ -478,13 +442,13 @@ impl AppState {
                 .set_type(MessageType::Info)
                 .set_text("Please select an Ebook to enable this function.")
                 .set_title("Ebook not selected")
-                .show_alert();
+                .show_alert().expect("Error while selecting an Ebook");
         } else if data.edit_mode {
             MessageDialog::new()
                 .set_type(MessageType::Warning)
                 .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
                 .set_title("Ebook in edit mode")
-                .show_alert();
+                .show_alert().expect("Error while selecting an Ebook but the app is in EDIT MODE");
         } else {
             data.display_menu = !data.display_menu;
         }
@@ -496,20 +460,20 @@ impl AppState {
                 .set_type(MessageType::Info)
                 .set_text("Please select an Ebook to enable this function.")
                 .set_title("Ebook not selected")
-                .show_alert();
+                .show_alert().expect("Error while selecting an Ebook");
         } else if data.edit_mode {
             MessageDialog::new()
                 .set_type(MessageType::Warning)
                 .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
                 .set_title("Ebook in edit mode")
-                .show_alert();
+                .show_alert().expect("Error while selecting an Ebook but the app is in EDIT MODE");
         } else {
             if data.string_bookmark.len() == 0 {
                 MessageDialog::new()
                     .set_type(MessageType::Warning)
                     .set_text("Please insert a title in order to create a new bookmark")
                     .set_title("No title for the bookmark")
-                    .show_alert();
+                    .show_alert().expect("Error while trying to load bookmarks");
                 return;
             }
 
@@ -526,7 +490,7 @@ impl AppState {
                     .set_type(MessageType::Warning)
                     .set_text("You've already inserted a bookmark for this page")
                     .set_title("Bookmark already inserted")
-                    .show_alert();
+                    .show_alert().expect("Error while founding the corresponding digital page");
             } else {
                 data.saves.bookmarks.push_back((data.string_bookmark.clone(), data.current_page.clone()));
                 data.save_to_json();
@@ -542,13 +506,13 @@ impl AppState {
                 .set_type(MessageType::Info)
                 .set_text("Please select an Ebook to enable this function.")
                 .set_title("Ebook not selected")
-                .show_alert();
+                .show_alert().expect("Error while selecting an Ebook");
         } else if data.edit_mode {
             MessageDialog::new()
                 .set_type(MessageType::Warning)
                 .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
                 .set_title("Ebook in edit mode")
-                .show_alert();
+                .show_alert().expect("Error while selecting an Ebook but the app is in EDIT MODE");
         } else {
             data.string_bookmark = String::new();
             data.new_bookmark = false;
@@ -579,7 +543,7 @@ impl AppState {
             Ok(file) => {
                 let reader = BufReader::new(file);
                 let mut de = serde_json::Deserializer::from_reader(reader);
-                let u = Json_struct::deserialize(&mut de).unwrap();
+                let u = JsonStruct::deserialize(&mut de).unwrap();
 
                 self.saves = u;
                 self.current_page = self.saves.last_page;
@@ -646,7 +610,6 @@ pub fn doit(src_dir: &str, dst_file: &str, method: zip::CompressionMethod) -> zi
 pub const GO_TO_POS: Selector<usize> = Selector::new("go_to_pos");
 pub const DELETE_BOOKMARK: Selector<(String, usize)> = Selector::new("delete_bookmark");
 pub const MODIFY_EDIT_MODE: Selector<bool> = Selector::new("modify_edit_mode");
-pub const SCAN_OCR_FILE: Selector<String> = Selector::new("scan_file");
 pub const GO_TO_POS_FROM_EDIT: Selector<usize> = Selector::new("edit_current_page");
 
 pub struct Delegate;
@@ -654,10 +617,10 @@ pub struct Delegate;
 impl AppDelegate<AppState> for Delegate {
     fn window_removed(
         &mut self,
-        id: WindowId,
+        _: WindowId,
         data: &mut AppState,
-        env: &Env,
-        ctx: &mut DelegateCtx<'_>,
+        _: &Env,
+        _: &mut DelegateCtx<'_>,
     ) {
         data.edit_mode = false;
     }
@@ -677,13 +640,13 @@ impl AppDelegate<AppState> for Delegate {
                     .set_type(MessageType::Error)
                     .set_text("There is already an ebook with this name in this folder, try again with another name or change folder.")
                     .set_title("Ebook already exists")
-                    .show_alert();
+                    .show_alert().expect("Error while trying to save file");
             } else {
-                let mut f = File::create(file_info.path().to_str().unwrap());
-                fs::copy(data.file_info.clone(), Path::new(file_info.path().to_str().unwrap()));
+                // let f = File::create(file_info.path().to_str().unwrap());
+                fs::copy(data.file_info.clone(), Path::new(file_info.path().to_str().unwrap())).expect("Error while trying to copy file");
 
-                let mut path = PathBuf::from(file_info.path().to_str().unwrap());
-                let mut dest_path = Path::new("/Ebook_Reader/output/");
+                let path = PathBuf::from(file_info.path().to_str().unwrap());
+                let dest_path = Path::new("/Ebook_Reader/output/");
 
 
                 fs::create_dir(dest_path).unwrap();
@@ -824,7 +787,7 @@ impl AppDelegate<AppState> for Delegate {
                 if data.current_page == stop_page - 1 && !one_page {
                     let mut file_to_edit = dest_path.to_str().unwrap().to_string();
                     file_to_edit.push_str(file_to_find_next.as_str());
-                    File::create(file_to_edit.clone());
+                    File::create(file_to_edit.clone()).expect("Error while trying to create file to be edited");
 
                     let mut f2 = std::fs::OpenOptions::new().write(true).truncate(true).open(file_to_edit).unwrap();
                     f2.write_all(next_content.as_bytes()).unwrap();
@@ -833,14 +796,14 @@ impl AppDelegate<AppState> for Delegate {
 
                 let mut file_to_edit = dest_path.to_str().unwrap().to_string();
                 file_to_edit.push_str(file_to_find.as_str());
-                File::create(file_to_edit.clone());
+                File::create(file_to_edit.clone()).expect("Error while trying to create file to be edited");
 
                 let mut f2 = std::fs::OpenOptions::new().write(true).truncate(true).open(file_to_edit).unwrap();
                 f2.write_all(new_content.as_bytes()).unwrap();
                 f2.flush().unwrap();
 
 
-                doit(dest_path.to_str().unwrap(), file_info.path().to_str().unwrap(), CompressionMethod::Bzip2);
+                doit(dest_path.to_str().unwrap(), file_info.path().to_str().unwrap(), CompressionMethod::Bzip2).expect("Error while trying to zip file");
                 let mut str = "File correctly saved at: ".to_string();
                 str.push_str(file_info.path().to_str().unwrap());
 
@@ -848,9 +811,9 @@ impl AppDelegate<AppState> for Delegate {
                     .set_type(MessageType::Info)
                     .set_text(str.as_str())
                     .set_title("Success")
-                    .show_alert();
+                    .show_alert().expect("Error while saving file");
 
-                fs::remove_dir_all(dest_path);
+                fs::remove_dir_all(dest_path).expect("Error while trying to remove directory");
             }
         }
 
@@ -909,15 +872,15 @@ impl AppDelegate<AppState> for Delegate {
                         .set_type(MessageType::Info)
                         .set_text(res.as_str())
                         .set_title("Page found")
-                        .show_alert();
+                        .show_alert().expect("Error while founding corresponding digital page");
                 } else {
-                    let mut res = "Research of the scanned page was not successfull, accuracy is too low".to_string();
+                    let res = "Research of the scanned page was not successfull, accuracy is too low".to_string();
 
                     MessageDialog::new()
                         .set_type(MessageType::Warning)
                         .set_text(res.as_str())
                         .set_title("Page not found")
-                        .show_alert();
+                        .show_alert().expect("Error while discovering corresponing digital page is not successful");
                 }
             }
         }
@@ -964,7 +927,7 @@ impl AppDelegate<AppState> for Delegate {
                         .set_type(MessageType::Warning)
                         .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
                         .set_title("Ebook in edit mode")
-                        .show_alert();
+                        .show_alert().expect("Error while selecting an Ebook but the app is in EDIT MODE");
                     return Handled::Yes;
                 }
 
@@ -1057,9 +1020,9 @@ impl AppDelegate<AppState> for Delegate {
                                         if img_occ > 0 {
                                             if pos.is_some() {
                                                 let mut displacement: usize = 0;
-                                                for i in 0..img_occ {
+                                                for _ in 0..img_occ {
                                                     let mut s1 = String::from("OEBPS/");
-                                                    let mut app = text[pos.unwrap() + 3 + displacement..].find("src=");
+                                                    let  app = text[pos.unwrap() + 3 + displacement..].find("src=");
                                                     for c in text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].chars() {
                                                         if c == '"' {
                                                             break;
@@ -1075,7 +1038,7 @@ impl AppDelegate<AppState> for Delegate {
                                                         }
                                                     };
 
-                                                    let mut r;
+                                                    let r;
 
                                                     if s1.to_lowercase().contains("jpg") || s1.to_lowercase().contains("jpeg") {
                                                         r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Jpeg).unwrap();
@@ -1124,18 +1087,18 @@ impl AppDelegate<AppState> for Delegate {
 
                                         pos_pageno += 1;
 
-                                        for i in 1..page_occ {
+                                        for _ in 1..page_occ {
                                             let mut next_page = res.as_ref().unwrap()[init.unwrap() + pos_pageno..].find("<span class=\"x-ebookmaker-pageno\"").unwrap();
                                             next_page += res.as_ref().unwrap()[init.unwrap() + pos_pageno + next_page..].find("</span>").unwrap() + 6;
-                                            let mut text = res.as_ref().unwrap()[init.unwrap() + pos_pageno..init.unwrap() + pos_pageno + next_page + 1].to_string().clone();
-                                            let mut img_occ = text.matches("<img").count();
+                                            let  text = res.as_ref().unwrap()[init.unwrap() + pos_pageno..init.unwrap() + pos_pageno + next_page + 1].to_string().clone();
+                                            let img_occ = text.matches("<img").count();
                                             let mut pos = text.find("<img");
                                             if img_occ > 0 {
                                                 if pos.is_some() {
                                                     let mut displacement: usize = 0;
-                                                    for i in 0..img_occ {
+                                                    for _ in 0..img_occ {
                                                         let mut s1 = String::from("OEBPS/");
-                                                        let mut app = text[pos.unwrap() + 3 + displacement..].find("src=");
+                                                        let app = text[pos.unwrap() + 3 + displacement..].find("src=");
                                                         for c in text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].chars() {
                                                             if c == '"' {
                                                                 break;
@@ -1151,7 +1114,7 @@ impl AppDelegate<AppState> for Delegate {
                                                             }
                                                         };
 
-                                                        let mut r;
+                                                        let r;
 
                                                         if s1.to_lowercase().contains("jpg") || s1.to_lowercase().contains("jpeg") {
                                                             r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Jpeg).unwrap();
@@ -1203,9 +1166,9 @@ impl AppDelegate<AppState> for Delegate {
                                         if img_occ > 0 {
                                             if pos.is_some() {
                                                 let mut displacement: usize = 0;
-                                                for i in 0..img_occ {
+                                                for _ in 0..img_occ {
                                                     let mut s1 = String::from("OEBPS/");
-                                                    let mut app = text[pos.unwrap() + 3 + displacement..].find("src=");
+                                                    let app = text[pos.unwrap() + 3 + displacement..].find("src=");
                                                     for c in text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].chars() {
                                                         if c == '"' {
                                                             break;
@@ -1221,7 +1184,7 @@ impl AppDelegate<AppState> for Delegate {
                                                         }
                                                     };
 
-                                                    let mut r;
+                                                    let r;
 
                                                     if s1.to_lowercase().contains("jpg") || s1.to_lowercase().contains("jpeg") {
                                                         r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Jpeg).unwrap();
@@ -1271,9 +1234,9 @@ impl AppDelegate<AppState> for Delegate {
                                         if img_occ > 0 {
                                             if pos.is_some() {
                                                 let mut displacement: usize = 0;
-                                                for i in 0..img_occ {
+                                                for _ in 0..img_occ {
                                                     let mut s1 = String::from("OEBPS/");
-                                                    let mut app = res.as_ref().unwrap()[pos.unwrap() + 3 + displacement..].find("src=");
+                                                    let app = res.as_ref().unwrap()[pos.unwrap() + 3 + displacement..].find("src=");
                                                     for c in res.as_ref().unwrap()[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].chars() {
                                                         if c == '"' {
                                                             break;
@@ -1289,7 +1252,7 @@ impl AppDelegate<AppState> for Delegate {
                                                         }
                                                     };
 
-                                                    let mut r;
+                                                    let r;
                                                     if s1.to_lowercase().contains("jpg") || s1.to_lowercase().contains("jpeg") {
                                                         r = image::load_from_memory_with_format(archive.get_entry(s1.clone()).unwrap().as_slice(), image::ImageFormat::Jpeg).unwrap();
                                                     } else if s1.to_lowercase().contains("png") {

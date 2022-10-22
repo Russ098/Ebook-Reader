@@ -860,6 +860,7 @@ impl AppDelegate<AppState> for Delegate {
                         .show_alert().expect("Error while discovering corresponing digital page is not successful");
                 }
             }
+            data.scan_mode = false;
         }
 
         if cmd.is(GO_TO_POS_FROM_EDIT) {

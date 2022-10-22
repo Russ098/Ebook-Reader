@@ -459,8 +459,79 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
 
 
                 let init_double = state.ebook[state.current_page + 1].text.find("<body");
+                let end_body_double = state.ebook[state.current_page + 1].text.find("</html>");
                 i = 0;
+                if init_double.is_some() && end_body_double.is_some(){
+                    if end_body_double.unwrap() < init_double.unwrap() {
+                        for element in state.ebook[state.current_page + 1].text[..end_body_double.unwrap()].split("\n") {
+                            if element.contains("img") {
+                                for pixel in state.ebook[state.current_page + 1].images[i].image.clone() {
+                                    pixels_vec.push(pixel);
+                                }
+                                match pixels_vec.len() / (state.ebook[state.current_page + 1].images[i].width * state.ebook[state.current_page + 1].images[i].height) {
+                                    1 => {
+                                        image_buf = ImageBuf::from_raw(pixels_vec.clone(), ImageFormat::Grayscale, state.ebook[state.current_page + 1]
+                                            .images[i].width, state.ebook[state.current_page + 1].images[i].height);
+                                    }
+                                    3 => {
+                                        image_buf = ImageBuf::from_raw(pixels_vec.clone(), ImageFormat::Rgb, state.ebook[state.current_page + 1]
+                                            .images[i].width, state.ebook[state.current_page + 1].images[i].height);
+                                    }
+                                    4 => {
+                                        image_buf = ImageBuf::from_raw(pixels_vec.clone(), ImageFormat::RgbaPremul, state.ebook[state.current_page + 1]
+                                            .images[i].width, state.ebook[state.current_page + 1].images[i].height);
+                                    }
+                                    _ => { panic!("Unable to process the image") }
+                                }
 
+
+                                let img = Image::new(image_buf.clone()).fill_mode(FillStrat::Fill);
+
+                                if state.font_size.len() > 0 && check_valid_number(state.font_size.clone()) == "Ok" {
+                                    let sized = SizedBox::new(img).fix_size(image_buf.width().clone() as f64 * (state.font_size.clone().parse::<f64>().unwrap() / 40.),
+                                                                            image_buf.height().clone() as f64 * (state.font_size.clone().parse::<f64>().unwrap() / 40.));
+
+                                    let container = sized.border(Color::grey(0.6), 2.0).center().boxed();
+                                    c2.add_child(container);
+                                } else {
+                                    let sized = SizedBox::new(img).fix_size(image_buf.width().clone() as f64 * (1. / 40.),
+                                                                            image_buf.height().clone() as f64 * (1. / 40.));
+
+                                    let container = sized.border(Color::grey(0.6), 2.0).center().boxed();
+                                    c2.add_child(container);
+                                }
+
+
+                                i += 1;
+                                pixels_vec.clear();
+                            } else {
+                                let mut _string;
+
+                                let mut appStr = element.to_string();
+
+                                if appStr.len() >= 1 {
+                                    if appStr.chars().last().unwrap() == '<' {
+                                        appStr.replace_range(appStr.len() - 1.., "");
+                                    }
+                                }
+
+                                _string = strip_tags(appStr.as_str());
+
+                                if state.font_size.len() > 0 && check_valid_number(state.font_size.clone()) == "Ok" {
+                                    let rl = Label::new(_string.clone())
+                                        .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
+                                        .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size);
+                                    c2.add_child(rl);
+                                } else {
+                                    let rl = Label::new(_string.clone())
+                                        .with_text_size(KeyOrValue::Concrete(1.))
+                                        .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size);
+                                    c2.add_child(rl);
+                                }
+                            }
+                        }
+                    }
+                }
                 if init_double.is_some() {
                     for element in state.ebook[state.current_page + 1].text[init_double.unwrap()..].split("\n") {
                         if element.contains("img") {

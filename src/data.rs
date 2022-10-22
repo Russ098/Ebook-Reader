@@ -1,6 +1,7 @@
 #![allow(deprecated)]
 #![allow(unused_assignments)]
 #![allow(unused_variables)]
+
 use std::{fs, io};
 use druid::{Data, Lens, EventCtx, Env, commands, AppDelegate, DelegateCtx, Target, Command, Handled, Widget, WidgetExt, Event, LifeCycleCtx, LifeCycle, UpdateCtx, LayoutCtx, BoxConstraints, Size, PaintCtx, WidgetId, Selector, WindowDesc, WindowId, FileDialogOptions, FileSpec};
 use std::fs::{File};
@@ -331,7 +332,6 @@ impl AppState {
 
 
     pub fn click_help_button(_ctx: &mut EventCtx, _: &mut Self, _env: &Env) {
-
         let help_description = String::from("Welcome to Ebook Reader application v1.0.0, this is a short guide for the application.
         \nThese are the functions that you can use:
         \n- Open: use this button to open an epub file and navigate through its content
@@ -561,7 +561,6 @@ fn zip_dir<T>(it: &mut dyn Iterator<Item=OtherDirEntry>, prefix: &str, writer: T
             zip.write_all(&*buffer)?;
             buffer.clear();
         } else if name.as_os_str().len() != 0 {
-
             zip.add_directory_from_path(name, options)?;
         }
     }

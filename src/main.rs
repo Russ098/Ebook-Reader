@@ -3,6 +3,7 @@ extern crate core;
 use druid::{AppLauncher, WindowDesc};
 
 mod data;
+
 use data::AppState;
 use data::Delegate;
 

@@ -457,11 +457,10 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
                     c2.add_child(rl_page);
                 }
 
-
                 let init_double = state.ebook[state.current_page + 1].text.find("<body");
                 let end_body_double = state.ebook[state.current_page + 1].text.find("</html>");
                 i = 0;
-                if init_double.is_some() && end_body_double.is_some(){
+                if init_double.is_some() && end_body_double.is_some() {
                     if end_body_double.unwrap() < init_double.unwrap() {
                         for element in state.ebook[state.current_page + 1].text[..end_body_double.unwrap()].split("\n") {
                             if element.contains("img") {

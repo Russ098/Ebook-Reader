@@ -459,6 +459,7 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
 
 
                 let init_double = state.ebook[state.current_page + 1].text.find("<body");
+                i = 0;
 
                 if init_double.is_some() {
                     for element in state.ebook[state.current_page + 1].text[init_double.unwrap()..].split("\n") {

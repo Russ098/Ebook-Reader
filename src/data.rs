@@ -1,8 +1,8 @@
 #![allow(deprecated)]
 #![allow(unused_assignments)]
-
+#![allow(unused_variables)]
 use std::{fs, io};
-use druid::{Data, Lens, EventCtx, Env, commands, AppDelegate, DelegateCtx, Target, Command, Handled, Widget, WidgetExt, Event, LifeCycleCtx, LifeCycle, UpdateCtx, LayoutCtx, BoxConstraints, Size, PaintCtx, WidgetId, Selector, WindowDesc,  WindowId, FileDialogOptions, FileSpec};
+use druid::{Data, Lens, EventCtx, Env, commands, AppDelegate, DelegateCtx, Target, Command, Handled, Widget, WidgetExt, Event, LifeCycleCtx, LifeCycle, UpdateCtx, LayoutCtx, BoxConstraints, Size, PaintCtx, WidgetId, Selector, WindowDesc, WindowId, FileDialogOptions, FileSpec};
 use std::fs::{File};
 use std::io::{BufReader, Read, Seek, Write};
 use std::path::{Path, PathBuf};
@@ -24,7 +24,6 @@ use walkdir::{WalkDir, DirEntry as OtherDirEntry};
 
 const SIZE_FONT: f64 = 20.0;
 
-//TODO: implemenatare una struttura che gestisca i capitolo secondo formattazione html v[0]="<p>Test<p>" v[1]="<img>....<img>"
 #[derive(Clone, Data, Lens, Serialize, Deserialize)]
 pub struct ImageOfPage {
     pub image: Vector<u8>,
@@ -84,10 +83,9 @@ impl Widget<AppState> for Rebuilder {
                             if data.edit_mode == false {
                                 if data.edit_current_page.len() == 0 {
                                     ctx.submit_command(GO_TO_POS_FROM_EDIT.with(1));
-                                }else{
+                                } else {
                                     ctx.submit_command(GO_TO_POS_FROM_EDIT.with(data.edit_current_page.parse::<usize>().unwrap()));
                                 }
-
                             }
                         } else {
                             if data.edit_mode == false {
@@ -241,9 +239,6 @@ impl AppState {
                 .set_title("Ebook in edit mode")
                 .show_alert().expect("Error while showing warning when the app is in EDIT MODE");
         } else {
-            //TODO: Fare la vera funzione
-
-
             data.edit_mode = !data.edit_mode;
 
             data.current_page_text = data.ebook[data.current_page].clone().text;
@@ -259,15 +254,13 @@ impl AppState {
 
 
     pub fn click_scan_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
-
         if data.ebook.len() == 0 {
             MessageDialog::new()
                 .set_type(MessageType::Info)
                 .set_text("Please select an Ebook to enable this function.")
                 .set_title("Ebook not selected")
                 .show_alert().expect("Error while selecting an Ebook");
-        }
-        else if data.edit_mode == true {
+        } else if data.edit_mode == true {
             MessageDialog::new()
                 .set_type(MessageType::Warning)
                 .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
@@ -300,31 +293,6 @@ impl AppState {
         }
     }
 
-    pub fn click_bookmark_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
-        if data.ebook.len() == 0 {
-            MessageDialog::new()
-                .set_type(MessageType::Info)
-                .set_text("Please select an Ebook to enable this function.")
-                .set_title("Ebook not selected")
-                .show_alert().expect("Error whle selecting an Ebook");
-        } else if data.edit_mode {
-            MessageDialog::new()
-                .set_type(MessageType::Warning)
-                .set_text("There is an Ebook open in edit mode, close that window to use again this function.")
-                .set_title("Ebook in edit mode")
-                .show_alert().expect("Error while selecting an Ebook but the app is in EDIT MODE");
-        } else {
-            /*
-                        data.saves.last_page = data.current_page;
-                        //TODO: aggiornare anche i bookmarks
-
-                        data.save_to_json();*/
-
-            data.new_bookmark = !data.new_bookmark;
-        }
-    }
-
-
     pub fn click_single_page_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         if data.ebook.len() == 0 {
             MessageDialog::new()
@@ -339,7 +307,6 @@ impl AppState {
                 .set_title("Ebook in edit mode")
                 .show_alert().expect("Error while selecting an Ebook but the app is in EDIT MODE");
         } else {
-            //TODO: Fare la vera funzione
             data.double_page = false;
         }
     }
@@ -358,12 +325,32 @@ impl AppState {
                 .set_title("Ebook in edit mode")
                 .show_alert().expect("Error while selecting an Ebook but the app is in EDIT MODE");
         } else {
-            //TODO: Fare la vera funzione
             data.double_page = true;
         }
     }
 
-    //TODO: Resettare il re
+
+    pub fn click_help_button(_ctx: &mut EventCtx, _: &mut Self, _env: &Env) {
+
+        let help_description = String::from("Welcome to Ebook Reader application v1.0.0, this is a short guide for the application.
+        \nThese are the functions that you can use:
+        \n- Open: use this button to open an epub file and navigate through its content
+        \n- Edit: use this button to edit the epub content of the current page. Be careful, inappropriate html changes can corrupt the new file, we suggest you to only edit the contents of the tags
+        \n- Scan: use this button to select a jpg/png image of the physical book to navigate to the corresponding digital page. Be careful, the success of this function depends on the image quality!
+        \n- Previous/Next Page: use these buttons to navigate through the ebook digital pages, you can use the text field to directly navigate to the desired page
+        \n- Bookmark section: this section allows you to create a new bookmark at the current page assigning it a name
+        \n- Menu: use this button to toggle a new section in which you can find all the bookmarks you created and ebook chapters, you can interact with them (by clicking) to navigate to the corresponding page. To delete a bookmark click on the red 'x'
+        \n- Single Page/Double Page: use these buttons to display one or two digital pages
+        \n- Font Section: use this section to adjust the text dimensions");
+
+        let dialog = MessageDialog::new()
+            .set_type(MessageType::Info)
+            .set_text(help_description.clone().as_str())
+            .set_title("Help")
+            .show_alert()
+            .expect("Error opening help dialog");
+    }
+
     pub fn click_previous_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         if data.ebook.len() == 0 {
             MessageDialog::new()
@@ -384,7 +371,6 @@ impl AppState {
                     let new_page = data.current_page.to_string();
                     data.edit_current_page = new_page;
                     data.saves.last_page = data.current_page;
-                    //TODO: aggiornare anche i bookmarks
                     data.save_to_json();
                 }
             } else {
@@ -393,7 +379,6 @@ impl AppState {
                     let new_page = data.current_page.to_string();
                     data.edit_current_page = new_page;
                     data.saves.last_page = data.current_page;
-                    //TODO: aggiornare anche i bookmarks
                     data.save_to_json();
                 }
             }
@@ -420,7 +405,6 @@ impl AppState {
                     let new_page = data.current_page.to_string();
                     data.edit_current_page = new_page;
                     data.saves.last_page = data.current_page;
-                    //TODO: aggiornare anche i bookmarks
                     data.save_to_json();
                 }
             } else {
@@ -429,7 +413,6 @@ impl AppState {
                     let new_page = data.current_page.to_string();
                     data.edit_current_page = new_page;
                     data.saves.last_page = data.current_page;
-                    //TODO: aggiornare anche i bookmarks
                     data.save_to_json();
                 }
             }
@@ -668,8 +651,6 @@ impl AppDelegate<AppState> for Delegate {
                 let mut next_stop_page = 0;
 
                 data.chapters.iter().enumerate().for_each(|(i, x)| {
-
-
                     if i == i_found {
                         next_stop_page = x.target_page;
                     }
@@ -936,7 +917,6 @@ impl AppDelegate<AppState> for Delegate {
                 {
                     Ok(mut archive) => {
                         if data.ebook.len() > 0 {
-                            //TODO: aggiornare anche i bookmarks
                             data.saves.last_page = data.current_page;
                             data.save_to_json();
                         }
@@ -1022,7 +1002,7 @@ impl AppDelegate<AppState> for Delegate {
                                                 let mut displacement: usize = 0;
                                                 for _ in 0..img_occ {
                                                     let mut s1 = String::from("OEBPS/");
-                                                    let  app = text[pos.unwrap() + 3 + displacement..].find("src=");
+                                                    let app = text[pos.unwrap() + 3 + displacement..].find("src=");
                                                     for c in text[pos.unwrap() + 3 + app.unwrap() + 5 + displacement..].chars() {
                                                         if c == '"' {
                                                             break;
@@ -1090,7 +1070,7 @@ impl AppDelegate<AppState> for Delegate {
                                         for _ in 1..page_occ {
                                             let mut next_page = res.as_ref().unwrap()[init.unwrap() + pos_pageno..].find("<span class=\"x-ebookmaker-pageno\"").unwrap();
                                             next_page += res.as_ref().unwrap()[init.unwrap() + pos_pageno + next_page..].find("</span>").unwrap() + 6;
-                                            let  text = res.as_ref().unwrap()[init.unwrap() + pos_pageno..init.unwrap() + pos_pageno + next_page + 1].to_string().clone();
+                                            let text = res.as_ref().unwrap()[init.unwrap() + pos_pageno..init.unwrap() + pos_pageno + next_page + 1].to_string().clone();
                                             let img_occ = text.matches("<img").count();
                                             let mut pos = text.find("<img");
                                             if img_occ > 0 {
@@ -1222,12 +1202,7 @@ impl AppDelegate<AppState> for Delegate {
 
                                         data.ebook.push_back(Page::new());
                                         page_no += 1;
-                                    }
-
-                                    //TODO: revisionare una volta fatto il salvataggio (per la questione relativa al segnalibro:
-                                    // quando chiudo l'app, la prossima riapertura mi riporta all'ultima pagina letta (?))
-                                    // let res = archive.get_entry_as_str(f);
-                                    else {
+                                    } else {
                                         page_not_ended = false;
                                         let img_occ = res.as_ref().unwrap()[init.unwrap()..].matches("<img").count();
                                         let mut pos = res.as_ref().unwrap()[init.unwrap()..].find("<img");
@@ -1300,7 +1275,6 @@ impl AppDelegate<AppState> for Delegate {
                         }
                     }
                     Err(error) => {
-                        //TODO
                         println!("Error while opening archive: {}", error);
                     }
                 }

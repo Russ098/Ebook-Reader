@@ -50,7 +50,7 @@ fn option_row() -> impl Widget<AppState> {
     let scan_button = Button::new("Scan").padding(5.0).on_click(AppState::click_scan_button);
 
 
-    let help_button = Button::new("Help").padding(5.0);
+    let help_button = Button::new("Help").padding(5.0).on_click(AppState::click_help_button);
     let previous_button = Button::new("Previous Page").padding(5.0).on_click(AppState::click_previous_button);
     let change_page = TextBox::new()
         .with_placeholder("50")
@@ -86,8 +86,6 @@ fn settings_row() -> impl Widget<AppState> {
     let plus_button = Button::new("+").padding(5.0).on_click(AppState::click_plus_button);
     let min_button = Button::new("-").padding(5.0).on_click(AppState::click_min_button);
 
-
-    //TODO: RENDERE SOLO NUMERICO LA TEXTBOX PER IL FONT SIZE
 
     let edit_size_text = TextBox::new()
         .with_placeholder("50")
@@ -181,8 +179,6 @@ pub fn check_valid_number(elem: String) -> String {
         return "Not valid".to_string();
     }
 }
-
-//TODO: Aggiustare il controllo per la dimensione del font quando viene messa a 0 oppure cancellata dall'utente
 
 pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
 
@@ -780,16 +776,12 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
                     .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size)));
             }
 
-
-
-            //TODO: togliere il cliccabile negli spazi tra i capitoli
-
             if state.saves.bookmarks.len() > 0 {
                 for bookmark in state.saves.bookmarks.clone() {
                     let mut ro = Flex::row();
 
                     if state.font_size.len() > 0 && check_valid_number(state.font_size.clone()) == "Ok"{
-                        let ch = ControllerHost::new(Label::new(bookmark.0.clone() + " - pag. " + (bookmark.1.clone() + 1).to_string().as_str())
+                        let ch = ControllerHost::new(Label::new(bookmark.0.clone() + " - pag. " + (bookmark.1.clone()).to_string().as_str())
                                                              .with_text_size(KeyOrValue::Concrete(state.font_size.clone().parse::<f64>().unwrap()))
                                                              .with_text_color(KeyOrValue::Concrete(Color::LIME))
                                                              .with_line_break_mode(LineBreaking::WordWrap).fix_width(state.window_size), Click::new(move |ctx, _, _| {

@@ -1,7 +1,6 @@
 extern crate core;
 
 use druid::{AppLauncher, WindowDesc};
-// use gtk::{CssProvider, CssProviderExt};
 
 mod data;
 use data::AppState;

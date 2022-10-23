@@ -13,6 +13,8 @@ use view::build_ui;
 
 
 pub fn main() {
+
+    //Creating and launching the main window of the application
     let initial_state = AppState::new();
     let main_window = WindowDesc::new(build_ui)
         .title("Ebook Reader")

@@ -7,14 +7,16 @@ use druid::widget::{TextBox, Button, Scroll, SizedBox, Image, FillStrat, Label, 
 use voca_rs::strip::strip_tags;
 use voca_rs::Voca;
 
+//Creating the layout for defining a new bookmark
+
 fn bookmark_row() -> impl Widget<AppState> {
     let mut r = Flex::row();
-
 
     r.add_child(Label::new("Create a new Bookmark").with_text_color(KeyOrValue::Concrete(Color::BLACK)).padding(5.0));
     r.add_child(TextBox::new().with_placeholder("Title")
         .padding(5.0)
         .lens(AppState::string_bookmark));
+
     r.add_child(Button::new("Apply").padding(5.0).on_click(AppState::click_confirm_bookmark_button));
     r.add_child(Button::new("Deny").padding(5.0).on_click(AppState::click_reject_bookmark_button));
 
@@ -23,6 +25,13 @@ fn bookmark_row() -> impl Widget<AppState> {
         .background(Color::WHITE)
         .border(Color::GRAY, 0.5)
 }
+
+/*
+Creating the layout for the functions: Open, Edit, Scan, Help and the page navigation section;
+Open function is managed through FileDialogOptions;
+TextBox in the navigation section depends on the state of the AppState's variable edit_current_page
+and is done through the method lens.
+*/
 
 fn option_row() -> impl Widget<AppState> {
     let epub = FileSpec::new("Epub file", &["epub"]);
@@ -79,6 +88,13 @@ fn option_row() -> impl Widget<AppState> {
         .border(Color::GRAY, 0.5)
 }
 
+/*
+Creating the layout for the functions: Menu, Single Page, Double Page and the font size section;
+The function Menu updates the state of the AppState's variable display_menu in order to edit the app
+main section adding a new column;
+TextBox in the font size section depends on the state of the AppState's variable font_size and is
+done through the method lens.
+*/
 fn settings_row() -> impl Widget<AppState> {
     let display_menu_button = Button::new("Menu").padding(5.0).on_click(AppState::click_display_menu_button);
     let single_page_button = Button::new("Single Page").padding(5.0).on_click(AppState::click_single_page_button);
@@ -110,6 +126,10 @@ fn settings_row() -> impl Widget<AppState> {
         .border(Color::GRAY, 0.5)
 }
 
+/*
+This is the main function of the whole application, it is invocated by the main and its purpose is
+to create the entire User Interface.
+*/
 pub fn build_ui() -> impl Widget<AppState> {
     let mut c = Flex::column();
     c.add_child(option_row());
@@ -119,17 +139,26 @@ pub fn build_ui() -> impl Widget<AppState> {
     return c;
 }
 
+/*
+This function is invocated when the user press the Edit button and all the constraints are met.
+Its purpose is to build a new view based on the previous one, but with different functionalities
+*/
 pub fn build_ui_edit_mode() -> impl Widget<AppState> {
     let mut c = Flex::column();
 
     c.add_child(option_row_edit_mode());
-
 
     c.add_flex_child(Scroll::new(TextBox::multiline().lens(AppState::current_page_text).expand_width()).vertical(), 1.);
 
     return c;
 }
 
+/*
+Creating the layout for the functions in the edit view: Save new version and Undo;
+The function Save new version submits the command SHOW_SAVE_PANEL;
+The function Undo submits a new command with the Selector MODIFY_EDIT_MODE and also the command
+CLOSE_WINDOW.
+*/
 fn option_row_edit_mode() -> impl Widget<AppState> {
     let epub = FileSpec::new("Epub file", &["epub"]);
     let default_save_name = String::from("MyFile.epub");
@@ -165,6 +194,10 @@ fn option_row_edit_mode() -> impl Widget<AppState> {
         .border(Color::GRAY, 0.5)
 }
 
+/*
+This function checks if a passed String is parsable into a f64, if so it also checks if the number
+is positive or not. The function returns "Ok" if it passes all the checks.
+*/
 pub fn check_valid_number(elem: String) -> String {
     if elem.parse::<f64>().is_ok() {
         if elem.parse::<f64>().unwrap().is_sign_positive() {
@@ -177,6 +210,14 @@ pub fn check_valid_number(elem: String) -> String {
     }
 }
 
+/*
+This is the core of the main section of the view, it builds a Box of dynamic Widgets of AppState.
+Its purpose is to display the ebook whenever is selected and valid; there are 4 versions for this
+view: Single Page, Double Page and these 2 versions with the menu open. It also creates a Row
+indicating the current page/s and the size of the Label depends on the font_size AppState variable.
+In case there is no Ebook selected, there will be a default Label in the main view to describe to
+the user how to start using the app.
+*/
 pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
     let mut c = Flex::column();
     let mut i = 0 as usize;
@@ -185,8 +226,10 @@ pub fn build_widget(state: &AppState) -> Box<dyn Widget<AppState>> {
     let scroll;
     let mut c2 = Flex::column();
 
-
-    if state.ebook.len() > 0
+    if state.ebook.len() <= 0 {
+        c.add_child(Label::new("\n\n\n\n\n\n\n\n\t\t\t\t\t\t\t\t\tWelcome to Ebook Reader!\n\t\t\t\t\t\t\tPress the Open button to start reading an Ebook\n\t\t\t\t\t\t\tUse Help button to open the application guide")
+            .with_text_size(KeyOrValue::Concrete(20.)));
+    } else if state.ebook.len() > 0
         && state.font_size != "0"
         && state.edit_current_page.len() > 0
         && check_valid_number(state.clone().edit_current_page) != "Not valid"

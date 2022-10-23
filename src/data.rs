@@ -42,6 +42,10 @@ impl ImageOfPage {
     }
 }
 
+/*
+The purpose of this struct is to build and rebuild the content of the main section of the view based
+on the current state of the AppState struct. This is done through the function rebuild_inner
+*/
 pub struct Rebuilder {
     inner: Box<dyn Widget<AppState>>,
     window_size: f64,
@@ -60,6 +64,11 @@ impl Rebuilder {
     }
 }
 
+/*
+We have created a Widget of AppState for the Rebuilder struct manually managing the main function of
+Widget: event, lifecycle, update, layout, paint and id. In particular, our focus is on the update
+function in which we manage the navigation through the ebook pages.
+*/
 impl Widget<AppState> for Rebuilder {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut AppState, env: &Env) {
         if data.window_size != self.window_size {
@@ -166,7 +175,10 @@ impl JsonStruct {
     }
 }
 
-
+/*
+This is the main struct used by the application managing the state of the application and the
+current opened Ebook.
+*/
 #[derive(Clone, Data, Lens, Serialize, Deserialize)]
 pub struct AppState {
     pub font_size: String,
@@ -210,6 +222,9 @@ impl AppState {
         }
     }
 
+    /*
+    This function updates the AppState variable font_size adding 1
+    */
     pub fn click_plus_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         data.plus();
     }
@@ -217,6 +232,10 @@ impl AppState {
         let new_size = self.font_size.parse::<f64>().unwrap() + 1.;
         self.font_size = new_size.to_string();
     }
+
+    /*
+    This function updates the AppState variable font_size subtracting 1
+    */
     pub fn click_min_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         data.min();
     }
@@ -226,6 +245,12 @@ impl AppState {
             self.font_size = new_size.to_string();
         }
     }
+
+    /*
+    This function manages the opening of a new window to edit the Ebook current page.
+    Before creating the new window, it checks if the constraints are met or it will open a new
+    MessageDialog.
+    */
     pub fn click_edit_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         if data.ebook.len() == 0 {
             MessageDialog::new()
@@ -253,7 +278,11 @@ impl AppState {
         }
     }
 
-
+    /*
+    This function manages the selection of an image to scan with OCR in order to search in the Ebook.
+    Before to allow the user to select a new file, it checks if the constraints are met or it will
+    open a new MessageDialog.
+    */
     pub fn click_scan_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         if data.ebook.len() == 0 {
             MessageDialog::new()
@@ -294,6 +323,11 @@ impl AppState {
         }
     }
 
+
+    /*
+    This function updates the state of the AppState variable double_page to false, in order to
+    update the view. It checks if the constraints are met or it will open a new MessageDialog.
+    */
     pub fn click_single_page_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         if data.ebook.len() == 0 {
             MessageDialog::new()
@@ -312,6 +346,10 @@ impl AppState {
         }
     }
 
+    /*
+    This function updates the state of the AppState variable double_page to true, in order to
+    update the view. It checks if the constraints are met or it will open a new MessageDialog.
+    */
     pub fn click_double_page_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         if data.ebook.len() == 0 {
             MessageDialog::new()
@@ -331,6 +369,9 @@ impl AppState {
     }
 
 
+    /*
+    This function opens a MessageDialog with the guide of the application.
+    */
     pub fn click_help_button(_ctx: &mut EventCtx, _: &mut Self, _env: &Env) {
         let help_description = String::from("Welcome to Ebook Reader application v1.0.0, this is a short guide for the application.
         \nThese are the functions that you can use:
@@ -351,6 +392,11 @@ impl AppState {
             .expect("Error opening help dialog");
     }
 
+    /*
+    This function updates the AppState variable current_page in order to navigate through the Ebook.
+    It checks the constraints and if they are not met, it will display a MessageDialog or not
+    performing the variable update.
+    */
     pub fn click_previous_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         if data.ebook.len() == 0 {
             MessageDialog::new()
@@ -385,6 +431,11 @@ impl AppState {
         }
     }
 
+    /*
+    This function updates the AppState variable current_page in order to navigate through the Ebook.
+    It checks the constraints and if they are not met, it will display a MessageDialog or not
+    performing the variable update.
+    */
     pub fn click_next_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         if data.ebook.len() == 0 {
             MessageDialog::new()
@@ -419,6 +470,11 @@ impl AppState {
         }
     }
 
+    /*
+    This function updates the AppState variable display_menu in order to generate a new interactable
+    section that manages bookmarks and chapters related to the selected Ebook.
+    It checks if the constraints are met or it will open a new MessageDialog.
+    */
     pub fn click_display_menu_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         if data.ebook.len() == 0 {
             MessageDialog::new()
@@ -437,6 +493,11 @@ impl AppState {
         }
     }
 
+    /*
+    This function manages the creation of a new bookmark in the current page with a given title,
+    updating AppState and the json related to the selected Ebook.
+    It checks if the constraints are met or it will open a new MessageDialog.
+    */
     pub fn click_confirm_bookmark_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         if data.ebook.len() == 0 {
             MessageDialog::new()
@@ -483,6 +544,10 @@ impl AppState {
         }
     }
 
+    /*
+    This function will delete the title inserted by the user in the TextBox of the bookmark section.
+    It checks if the constraints are met or it will open a new MessageDialog.
+    */
     pub fn click_reject_bookmark_button(_ctx: &mut EventCtx, data: &mut Self, _env: &Env) {
         if data.ebook.len() == 0 {
             MessageDialog::new()
@@ -502,7 +567,10 @@ impl AppState {
         }
     }
 
-
+    /*
+    This function creates a new json file related to the selected Ebook in order to save the last
+    page open and the bookmarks.
+    */
     pub fn save_to_json(&self) {
         let serialized = serde_json::to_string(&self.saves).unwrap();
 
@@ -516,6 +584,10 @@ impl AppState {
         std::fs::write(p, serialized).unwrap();
     }
 
+    /*
+    This function searches the json file related to the selected Ebook in order to load the last
+    page opened and the bookmarks.
+    */
     pub fn load_from_json(&mut self) {
         let mut path = String::from("\\Ebook_Reader\\Metadata\\");
         path.push_str(self.title.as_str());
@@ -539,6 +611,9 @@ impl AppState {
     }
 }
 
+/*
+The zip_dir and doit functions create the new Ebook version edited by the user.
+*/
 fn zip_dir<T>(it: &mut dyn Iterator<Item=OtherDirEntry>, prefix: &str, writer: T, method: zip::CompressionMethod)
               -> zip::result::ZipResult<()>
     where T: Write + Seek
@@ -568,6 +643,7 @@ fn zip_dir<T>(it: &mut dyn Iterator<Item=OtherDirEntry>, prefix: &str, writer: T
     Result::Ok(())
 }
 
+
 pub fn doit(src_dir: &str, dst_file: &str, method: zip::CompressionMethod) -> zip::result::ZipResult<()> {
     if !Path::new(src_dir).is_dir() {
         return Err(ZipError::FileNotFound);
@@ -592,6 +668,32 @@ pub const GO_TO_POS_FROM_EDIT: Selector<usize> = Selector::new("edit_current_pag
 
 pub struct Delegate;
 
+/*
+The Delegate provides hooks for handling and modifying top-level events.
+- SAVE_FILE_AS: duplicates the selected Ebook, unzipping it and editing the file containing the
+current page edited by the user, zipping and converting into an epub file.
+
+- OPEN_FILE (with scan_mode): given the path of the selected image by the user, it performs the
+following command "tesseract {path} stdout" collecting the result and searching through the open
+Ebook in the AppState giving a result based on the percentage of text matches.
+
+- OPEN_FILE (without scan_mode): given the path of the selected epub file, it opens it using
+EpubArchive crate and navigates through all its files filling the AppState variables related to the
+current Ebook. In particular, it fills the ebook variable page by page using the presence of tag
+<span class="x-ebookmaker-pageno" inside the HTML files.
+
+- GO_TO_POS_FROM_EDIT: it updates the AppState variable current_page when the user inserts a specific
+page inside the TextBox in the Page navigation section.
+
+- MODIFY_EDIT_MODE: it updates the AppState variable edit_mode when the Undo button is clicked in
+the edit window in order to allow the user to interact again with the main window.
+
+- GO_TO_POS: it updates the AppState variable current_page when the user interacts with bookmarks
+and chapters in the menu section.
+
+- DELETE_BOOKMARK: it deletes the selected bookmark in AppState and it also updates the json file
+related to the current Ebook.
+*/
 impl AppDelegate<AppState> for Delegate {
     fn window_removed(
         &mut self,
@@ -620,12 +722,15 @@ impl AppDelegate<AppState> for Delegate {
                     .set_title("Ebook already exists")
                     .show_alert().expect("Error while trying to save file");
             } else {
-                // let f = File::create(file_info.path().to_str().unwrap());
+
                 fs::copy(data.file_info.clone(), Path::new(file_info.path().to_str().unwrap())).expect("Error while trying to copy file");
 
                 let path = PathBuf::from(file_info.path().to_str().unwrap());
                 let dest_path = Path::new("/Ebook_Reader/output/");
 
+                if Path::exists(dest_path){
+                    fs::remove_dir_all(dest_path).expect("Path not found");
+                }
 
                 fs::create_dir(dest_path).unwrap();
                 fs::create_dir(Path::new("/Ebook_Reader/output/META-INF")).unwrap();
@@ -691,12 +796,14 @@ impl AppDelegate<AppState> for Delegate {
                     for i in start_page_chapter..stop_page {
                         if data.current_page == i {
                             if i == start_page_chapter {
+                                next_content.push_str("\n");
                                 new_content.push_str(&data.current_page_text[data.current_page_text.find("<?xml").unwrap()..]);
                             } else if i == stop_page - 1 {
                                 new_content.push_str(&data.current_page_text[..data.current_page_text.find("</html>").unwrap() + 7]);
                                 for j in i..next_stop_page {
                                     if j == i {
                                         next_content.push_str(&data.current_page_text[data.current_page_text.find("<?xml").unwrap()..]);
+                                        next_content.push_str("\n");
                                     } else if j == next_stop_page - 1 {
                                         next_content.push_str(&data.ebook[j].text[..data.ebook[j].text.find("</html>").unwrap() + 7]);
                                     } else {
@@ -712,6 +819,9 @@ impl AppDelegate<AppState> for Delegate {
                             } else if i == stop_page - 1 {
                                 new_content.push_str(&data.ebook[i].text[..data.ebook[i].text.find("</html>").unwrap() + 7]);
                             } else {
+                                if i == start_page_chapter + 1 {
+                                    new_content.push_str("\n");
+                                }
                                 new_content.push_str(data.ebook[i].text.as_str());
                             }
                         }
@@ -775,19 +885,23 @@ impl AppDelegate<AppState> for Delegate {
                 File::create(file_to_edit.clone()).expect("Error while trying to create file to be edited");
 
                 let mut f2 = std::fs::OpenOptions::new().write(true).truncate(true).open(file_to_edit).unwrap();
+
                 f2.write_all(new_content.as_bytes()).unwrap();
                 f2.flush().unwrap();
-
 
                 doit(dest_path.to_str().unwrap(), file_info.path().to_str().unwrap(), CompressionMethod::Bzip2).expect("Error while trying to zip file");
                 let mut str = "File correctly saved at: ".to_string();
                 str.push_str(file_info.path().to_str().unwrap());
 
+
                 MessageDialog::new()
                     .set_type(MessageType::Info)
-                    .set_text(str.as_str())
+                    .set_text(str.clone().as_str())
                     .set_title("Success")
-                    .show_alert().expect("Error while saving file");
+                    .reset_owner()
+                    .show_alert()
+                    .expect("Failed");
+
 
                 fs::remove_dir_all(dest_path).expect("Error while trying to remove directory");
             }
@@ -989,7 +1103,12 @@ impl AppDelegate<AppState> for Delegate {
 
                                     if page_occ > 0 {
                                         let mut pos_pageno = res.as_ref().unwrap()[init.unwrap()..].find("<span class=\"x-ebookmaker-pageno\"").unwrap();
-                                        pos_pageno += res.as_ref().unwrap()[init.unwrap() + pos_pageno..].find("</span>").unwrap() + 7;
+                                        if page_not_ended {
+                                            pos_pageno += res.as_ref().unwrap()[init.unwrap() + pos_pageno..].find("</span>").unwrap() + 7;
+                                        }else{
+                                            pos_pageno += res.as_ref().unwrap()[init.unwrap() + pos_pageno..].find("</span>").unwrap() + 6;
+                                        }
+
                                         let mut text = res.as_ref().unwrap()[init.unwrap()..pos_pageno].to_string().clone();
                                         let mut img_occ = text.matches("<img").count();
                                         let mut pos = text.find("<img");
